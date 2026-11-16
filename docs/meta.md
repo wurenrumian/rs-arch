@@ -61,6 +61,10 @@ VITEPRESS_BASE=/ npm run build
 站点部署在 rumian 的聚合服务上，挂在 `/rs-arch/` 子路径；新增站点需要在
 该机器 `sites/server.js` 的 `SITES` 表里注册一行，并在 `home/index.js` 补一条元数据。
 
+图在**构建期**就画好了：`docs/.vitepress/diagrams.ts` 把每个 `mermaid` 代码块交给
+[pele](https://pele.run) 同步渲染成内联 SVG，页面不加载任何图表运行时——切主题也不用重画，
+配色走 `--pele-*` 那几个 CSS 变量。图里语法写错会让 `npm run build` 直接失败，报出文件与正文行号。
+
 ## 目录结构
 
 ```text
@@ -69,6 +73,6 @@ docs/
   guide/                   阅读指南、核心事实、代码索引
   ch01 … ch06/             六章：每章一个地图页 + 每块一页 + 风险 + 证据索引
   quality/                 风险总表、已修复、文档不一致、未确认清单
-  .vitepress/              配置、主题、自定义样式
+  .vitepress/              配置、主题、自定义样式、图表渲染
   public/                  logo 与首页插图
 ```

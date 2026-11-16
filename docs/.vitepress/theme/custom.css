@@ -336,11 +336,24 @@ body {
   color: var(--vp-c-text-3);
 }
 
-/* -------------------------------------------------------------- mermaid */
+/* -------------------------------------------------------------- 图表 */
+/* 图在构建期由 pele 烘成内联 SVG，这里只接配色：亮暗各取主题 token，
+   所以切主题不用重渲染。--pele-line / --pele-border 用中间色，线太黑会压住正文。 */
 
-.vp-doc div.mermaid {
-  display: flex;
-  justify-content: center;
+.rs-diagram {
+  --pele-bg: var(--vp-c-bg-elv);
+  --pele-fg: var(--vp-c-text-1);
+  --pele-muted: var(--vp-c-text-3);
+  --pele-line: color-mix(in srgb, var(--vp-c-text-1) 72%, transparent);
+  --pele-surface: var(--vp-c-bg-soft);
+  --pele-surface-alt: var(--vp-c-bg-alt);
+  --pele-border: color-mix(in srgb, var(--vp-c-text-1) 26%, transparent);
+  --pele-accent: var(--vp-c-brand-1);
+  --pele-critical: var(--rs-accent);
+  --pele-font: var(--vp-font-family-base);
+  --pele-font-mono: var(--vp-font-family-mono);
+  --pele-radius: 8px;
+
   margin: 22px 0;
   padding: 14px;
   border: 1px solid var(--vp-c-divider);
@@ -349,9 +362,9 @@ body {
   overflow-x: auto;
 }
 
-.vp-doc div.mermaid svg {
-  max-width: 100%;
-  height: auto;
+.rs-diagram svg {
+  display: block;
+  margin: 0 auto;
 }
 
 /* -------------------------------------------------------------- 侧栏与导航 */

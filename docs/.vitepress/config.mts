@@ -1,5 +1,5 @@
 import { defineConfig } from 'vitepress'
-import { withMermaid } from 'vitepress-plugin-mermaid'
+import { mermaidToSvg } from './diagrams'
 
 /**
  * 站点基线：上游 RecStore 1f340167d。
@@ -147,102 +147,96 @@ const tokenize = (text: string) => {
   return out
 }
 
-export default withMermaid(
-  defineConfig({
-    lang: 'zh-CN',
-    title: 'RecStore 架构',
-    description:
-      'RecStore 的架构与设计讲解：稀疏 embedding 表为什么放在训练进程之外，读写如何跨进程落到参数服务器与存储引擎。',
-    base,
-    cleanUrls: true,
-    lastUpdated: true,
-    head: [
-      ['link', { rel: 'icon', type: 'image/svg+xml', href: `${base}logo.svg` }],
-      ['meta', { name: 'theme-color', content: '#0f6f63' }]
+export default defineConfig({
+  lang: 'zh-CN',
+  title: 'RecStore 架构',
+  description:
+    'RecStore 的架构与设计讲解：稀疏 embedding 表为什么放在训练进程之外，读写如何跨进程落到参数服务器与存储引擎。',
+  base,
+  cleanUrls: true,
+  lastUpdated: true,
+  head: [
+    ['link', { rel: 'icon', type: 'image/svg+xml', href: `${base}logo.svg` }],
+    ['meta', { name: 'theme-color', content: '#0f6f63' }]
+  ],
+
+  markdown: {
+    lineNumbers: false,
+    theme: { light: 'github-light', dark: 'github-dark' },
+    image: { lazyLoading: true },
+    config: mermaidToSvg
+  },
+
+  themeConfig: {
+    logo: '/logo.svg',
+    siteTitle: 'RecStore 架构',
+
+    nav: [
+      { text: '总览', link: '/guide/', activeMatch: '^/guide/' },
+      {
+        text: '六章',
+        items: [
+          { text: '01 · 系统总览与构建', link: '/ch01/' },
+          { text: '02 · 计算层', link: '/ch02/' },
+          { text: '03 · 参数服务器与传输', link: '/ch03/' },
+          { text: '04 · RDMA 深潜', link: '/ch04/' },
+          { text: '05 · 存储与内存', link: '/ch05/' },
+          { text: '06 · 测试与工具', link: '/ch06/' }
+        ]
+      },
+      { text: '质量档案', link: '/quality/risks', activeMatch: '^/quality/' },
+      { text: '维护', link: '/meta', activeMatch: '^/meta' }
     ],
 
-    markdown: {
-      lineNumbers: false,
-      theme: { light: 'github-light', dark: 'github-dark' },
-      image: { lazyLoading: true }
-    },
+    sidebar,
 
-    mermaid: {
-      // 默认让 mermaid 自己选主题，dark 模式由插件切换
-      flowchart: { curve: 'basis' }
-    },
+    outline: { level: [2, 3], label: '本页' },
 
-    themeConfig: {
-      logo: '/logo.svg',
-      siteTitle: 'RecStore 架构',
-
-      nav: [
-        { text: '总览', link: '/guide/', activeMatch: '^/guide/' },
-        {
-          text: '六章',
-          items: [
-            { text: '01 · 系统总览与构建', link: '/ch01/' },
-            { text: '02 · 计算层', link: '/ch02/' },
-            { text: '03 · 参数服务器与传输', link: '/ch03/' },
-            { text: '04 · RDMA 深潜', link: '/ch04/' },
-            { text: '05 · 存储与内存', link: '/ch05/' },
-            { text: '06 · 测试与工具', link: '/ch06/' }
-          ]
-        },
-        { text: '质量档案', link: '/quality/risks', activeMatch: '^/quality/' },
-        { text: '维护', link: '/meta', activeMatch: '^/meta' }
-      ],
-
-      sidebar,
-
-      outline: { level: [2, 3], label: '本页' },
-
-      search: {
-        provider: 'local',
-        options: {
-          translations: {
-            button: { buttonText: '搜索文档', buttonAriaLabel: '搜索文档' },
-            modal: {
-              displayDetails: '显示详情',
-              resetButtonTitle: '清空',
-              backButtonTitle: '返回',
-              noResultsText: '没有找到结果',
-              footer: {
-                selectText: '选择',
-                navigateText: '切换',
-                closeText: '关闭'
-              }
-            }
-          },
-          miniSearch: {
-            options: {
-              tokenize,
-              searchOptions: { fuzzy: 0.15, prefix: true, boost: { title: 4, text: 2, titles: 3 } }
+    search: {
+      provider: 'local',
+      options: {
+        translations: {
+          button: { buttonText: '搜索文档', buttonAriaLabel: '搜索文档' },
+          modal: {
+            displayDetails: '显示详情',
+            resetButtonTitle: '清空',
+            backButtonTitle: '返回',
+            noResultsText: '没有找到结果',
+            footer: {
+              selectText: '选择',
+              navigateText: '切换',
+              closeText: '关闭'
             }
           }
+        },
+        miniSearch: {
+          options: {
+            tokenize,
+            searchOptions: { fuzzy: 0.15, prefix: true, boost: { title: 4, text: 2, titles: 3 } }
+          }
         }
-      },
-
-      docFooter: { prev: '上一块', next: '下一块' },
-      darkModeSwitchLabel: '主题',
-      sidebarMenuLabel: '目录',
-      returnToTopLabel: '回到顶部',
-      lastUpdated: {
-        text: '最后更新',
-        formatOptions: { dateStyle: 'medium', timeStyle: 'short' }
-      },
-
-      editLink: {
-        pattern: `${REPO}/edit/main/docs/:path`,
-        text: '在 GitHub 上改这一页'
-      },
-
-      socialLinks: [{ icon: 'github', link: REPO }],
-
-      footer: {
-        message: '按 calm-explain 组织的架构讲解 · 事实基线 RecStore 1f340167d',
-        copyright: '只读文档，与上游代码仓库解耦维护'
       }
+    },
+
+    docFooter: { prev: '上一块', next: '下一块' },
+    darkModeSwitchLabel: '主题',
+    sidebarMenuLabel: '目录',
+    returnToTopLabel: '回到顶部',
+    lastUpdated: {
+      text: '最后更新',
+      formatOptions: { dateStyle: 'medium', timeStyle: 'short' }
+    },
+
+    editLink: {
+      pattern: `${REPO}/edit/main/docs/:path`,
+      text: '在 GitHub 上改这一页'
+    },
+
+    socialLinks: [{ icon: 'github', link: REPO }],
+
+    footer: {
+      message: '按 calm-explain 组织的架构讲解 · 事实基线 RecStore 1f340167d',
+      copyright: '只读文档，与上游代码仓库解耦维护'
     }
-  })
-)
+  }
+})
