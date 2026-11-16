@@ -72,22 +72,10 @@ RecStore 把推荐模型的稀疏 embedding 表放到训练进程之外：Python
 ## 从哪里开始
 
 <div class="rs-cards">
-  <div class="rs-card">
-    <h3><a href="/guide/">这个站怎么读</a></h3>
-    <p>阅读约定、证据标签、三条按目标划分的路线。</p>
-  </div>
-  <div class="rs-card">
-    <h3><a href="/guide/code-index">代码索引</a></h3>
-    <p>仓库目录 ↔ 章节的对照表，想改哪里直接跳到对应块。</p>
-  </div>
-  <div class="rs-card">
-    <h3><a href="/guide/facts">十条核心事实</a></h3>
-    <p>六章共同核对过的结论，先记住这十条，再看细节。</p>
-  </div>
-  <div class="rs-card">
-    <h3><a href="/quality/risks">风险总表</a></h3>
-    <p>15 条按影响面排序的坑：静默补零、无幂等重试、名不副实的持久化。</p>
-  </div>
+  <RsCard to="/guide/" title="这个站怎么读">阅读约定、证据标签、三条按目标划分的路线。</RsCard>
+  <RsCard to="/guide/code-index" title="代码索引">仓库目录 ↔ 章节的对照表，想改哪里直接跳到对应块。</RsCard>
+  <RsCard to="/guide/facts" title="十条核心事实">六章共同核对过的结论，先记住这十条，再看细节。</RsCard>
+  <RsCard to="/quality/risks" title="风险总表">15 条按影响面排序的坑：静默补零、无幂等重试、名不副实的持久化。</RsCard>
 </div>
 
 ## 事实基线

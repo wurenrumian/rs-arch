@@ -13,21 +13,9 @@ outline: [2, 3]
 ## 站点结构
 
 <div class="rs-cards">
-  <div class="rs-card">
-    <span class="rs-n">CHAPTERS</span>
-    <h3><a href="/ch01/">六章正文</a></h3>
-    <p>01 总览与构建 → 02 计算层 → 03 参数服务器 → 04 RDMA → 05 存储与内存 → 06 测试与工具。</p>
-  </div>
-  <div class="rs-card">
-    <span class="rs-n">REFERENCE</span>
-    <h3><a href="/guide/facts">核心事实与代码索引</a></h3>
-    <p>跨章节的结论清单，以及目录 ↔ 章节的对照表。</p>
-  </div>
-  <div class="rs-card">
-    <span class="rs-n">QUALITY</span>
-    <h3><a href="/quality/risks">质量档案</a></h3>
-    <p>风险总表、已修复记录、文档与代码的不一致、需要实测才能确认的清单。</p>
-  </div>
+  <RsCard to="/ch01/" label="CHAPTERS" title="六章正文">01 总览与构建 → 02 计算层 → 03 参数服务器 → 04 RDMA → 05 存储与内存 → 06 测试与工具。</RsCard>
+  <RsCard to="/guide/facts" label="REFERENCE" title="核心事实与代码索引">跨章节的结论清单，以及目录 ↔ 章节的对照表。</RsCard>
+  <RsCard to="/quality/risks" label="QUALITY" title="质量档案">风险总表、已修复记录、文档与代码的不一致、需要实测才能确认的清单。</RsCard>
 </div>
 
 六章共 47 块。每章的开头是一张**阅读地图**（一句话、部件表、关系、概念表、建议读法），

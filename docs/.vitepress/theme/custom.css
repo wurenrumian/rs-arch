@@ -247,6 +247,8 @@ body {
   border: 1px solid var(--vp-c-divider);
   border-radius: var(--rs-radius);
   background: var(--vp-c-bg-elv);
+  color: var(--vp-c-text-1);
+  text-decoration: none !important;
   transition: border-color 0.18s ease, transform 0.18s ease;
 }
 
@@ -259,12 +261,13 @@ body {
   margin: 0 0 6px !important;
   font-size: 15px !important;
   line-height: 1.5;
+  font-weight: 650;
+  color: var(--vp-c-text-1);
+  transition: color 0.18s ease;
 }
 
-.rs-card h3 a {
-  color: var(--vp-c-text-1) !important;
-  text-decoration: none !important;
-  font-weight: 650;
+.rs-card:hover h3 {
+  color: var(--vp-c-brand-1);
 }
 
 .rs-card p {
