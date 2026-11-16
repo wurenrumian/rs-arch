@@ -1,0 +1,17 @@
+{
+  "name": "rs-arch",
+  "private": true,
+  "version": "1.0.0",
+  "description": "RecStore 架构与设计讲解（VitePress 站点）",
+  "type": "module",
+  "scripts": {
+    "dev": "vitepress dev docs",
+    "build": "vitepress build docs",
+    "preview": "vitepress preview docs"
+  },
+  "devDependencies": {
+    "mermaid": "^11.17.2",
+    "vitepress": "^1.6.4",
+    "vitepress-plugin-mermaid": "^2.0.17"
+  }
+}
