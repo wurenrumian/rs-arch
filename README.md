@@ -12,7 +12,7 @@ RecStore 把推荐模型的稀疏 embedding 表放到训练进程之外：Python
 `BaseKV`（默认 `KVEngineComposite` = DRAM 索引 + DRAM 值存储）。
 
 六章均按上游 `upstream/main 1f340167d` 核对，用 `calm-explain` 组织成“阅读地图 + 分块推进”。
-对应代码在 RecStore 仓库（本地 `../RecStore`，上游 [RecStore/RecStore](https://github.com/RecStore/RecStore)）；
+对应代码在 RecStore 仓库（本地 `D:\Project\RecStore`，上游 [RecStore/RecStore](https://github.com/RecStore/RecStore)）；
 历史版本、上游增量摘要留在该仓库本地未入库的 `tmp/archive/docs/` 与 `tmp/remote/`。
 
 # 章节导航
