@@ -47,7 +47,7 @@ tags: [architecture, overview]
 
 ### 它是什么
 
-一套三段式代码：训练进程、服务进程、存储。目录按语言和职责切，与这三段并不一一对应。C++ 主体在 `src/`，Python 包源码在 `src/python/pytorch/`，可运行样例在 `model_zoo/`，外围工具在 `tools/`，第三方依赖在 `third_party/`，文档站在 `docs/`，过程性材料（状态板、journal）在 `tmp/`。本章的架构讲解已移出到独立仓库，不再占用 `tmp/`。
+一套三段式代码：训练进程、服务进程、存储。目录按语言和职责切，与这三段并不一一对应。C++ 主体在 `src/`，Python 包源码在 `src/python/pytorch/`，可运行样例在 `model_zoo/`，外围工具在 `tools/`，第三方依赖在 `third_party/`，文档站在 `docs/`，过程性材料（状态板、journal、本讲解）在 `tmp/`。
 
 ### 它为什么存在
 
@@ -69,7 +69,7 @@ tags: [architecture, overview]
 | `dockerfiles/`、`cmake/` | 构建镜像与依赖装配（`Dockerfile.recstore`、`setup_centos7.sh` 把第三方库装到 `$RECSTORE_DEPS_PREFIX`）；CMake 查找模块 `FindGRPC.cmake`、`FindCityhash.cmake`、`common.cmake` |
 | `third_party/` | 15 个 git submodule + 由脚本生成的安装前缀（后者不在仓库里） |
 | `docs/`、`mkdocs.yml` | mkdocs 文档站源码与导航；`docs/config.md` 是配置字段参考 |
-| `.agents/skills/`、`tmp/` | agent 操作指南（`rs-benchmark-*`、`rs-loss-aligned`）；过程区 `STATE.md`、`docs/index.md`、`journal/`、`remote/`（架构讲解已移到独立仓库） |
+| `.agents/skills/`、`tmp/` | agent 操作指南（`rs-benchmark-*`、`rs-loss-aligned`）；过程区 `STATE.md`、`docs/index.md`、`journal/`、`remote/`、本讲解 |
 | 根文件 | `CMakeLists.txt`（构建入口）、`VERSION`（版本唯一来源，`0.1.0+cu126`，CMake 与 `pyproject.toml` 都读它）、`pyproject.toml`（scikit-build-core，只构建 `recstore_torch_ops`）、`recstore_config.json`（默认运行配置：GRPC、2 分片、PET_HASH + DRAM value） |
 
 `src/` 下 12 个一级目录：
