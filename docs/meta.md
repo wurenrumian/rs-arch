@@ -36,6 +36,7 @@ outline: [2]
 | 2026-11-16 | 只读同步 `1f340167d`（12 个提交），改 `rs_demo` 默认 `clock`，补 `recstore.telemetry` |
 | 2026-11-16 | 拆成 VitePress 站点，按块分页并重排导航 |
 | 2026-11-17 | 第 03、04 章按「导语 + 代号下沉」重写正文：叙述句只留概念名，类名与配置键集中到代码位置表，多步流程编号 |
+| 2026-11-17 | 全站补图与说人话：64 张 mermaid 图，符号密集处改图或改表；新增 `check:prose` / `check:tokens` / `check:tables` 三道体检 |
 
 ## 证据约定
 
@@ -59,12 +60,16 @@ npm run preview
 VITEPRESS_BASE=/ npm run build
 ```
 
-站点部署在 rumian 的聚合服务上，挂在 `/rs-arch/` 子路径；新增站点需要在
-该机器 `sites/server.js` 的 `SITES` 表里注册一行，并在 `home/index.js` 补一条元数据。
+站点部署在 rumian 的聚合服务上，挂在 `/rs-arch/` 子路径，产物由那边的聚合站点直接托管。新增子站要改两处：
 
-图在**构建期**就画好了：`docs/.vitepress/diagrams.ts` 把每个 `mermaid` 代码块交给
-[pele](https://pele.run) 同步渲染成内联 SVG，页面不加载任何图表运行时——切主题也不用重画，
-配色走 `--pele-*` 那几个 CSS 变量。图里语法写错会让 `npm run build` 直接失败，报出文件与正文行号。
+| 要改的地方 | 位置 |
+| --- | --- |
+| 站点清单 | `sites/server.js` 的 `SITES` 表 |
+| 首页元数据 | `home/index.js` |
+
+图在**构建期**就画好了：`docs/.vitepress/diagrams.ts` 把每个 mermaid 代码块交给 [pele](https://pele.run)
+同步渲染成内联 SVG，页面不加载任何图表运行时——切主题也不用重画，配色走 `--pele-*` 那几个 CSS 变量。
+图里语法写错会让构建直接失败，报出文件与正文行号。
 
 ## 目录结构
 

@@ -8,7 +8,25 @@ outline: [2, 3]
 
 ## 它是什么
 
-按检测点分七层，每层回答两个问题：要不要把 lane 置脏、重建能不能治好。
+举例：一次提交等了 60 s 也没等到状态字，这条 lane 被置脏，调用方拿到异常，而这批梯度不会自动重发。换一种：网卡报对端不再 ACK，同一条 lane 还有 3 次重建预算，2 s 内完成双边握手就能继续用；握手超时，它转终态。
+
+一次失败要不要置脏，能不能重建？
+
+```mermaid
+flowchart TB
+  A["一次失败"] -->|"参数或容量不够 写请求没发出去"| B["直接抛错 通道不动"]
+  A -->|"服务端回了业务状态"| D["正常响应 通道不动"]
+  A -->|"完成事件报错 等不到完成或状态字 健康探测判死"| C["把 lane 置脏并记下原因"]
+  C -->|"原因可重建且开关打开"| E{"重建预算还有吗"}
+  E -->|"有"| F["下一次取槽位时重建"]
+  E -->|"没有"| G["终态 这条 lane 不再使用"]
+  F -->|"双边握手成功"| H["恢复可用"]
+  F -->|"握手超时或异常"| G
+```
+
+读图：通向抛错与正常响应的两条箭头都止于调用进程，通道不动，也没有跨进程证据。真正把 lane 置脏的是第三条，它的证据来自完成事件或健康探测，也就是网卡和远端；而重建那条要和对端交换世代号，是全图唯一双向跨进程的箭头。
+
+按检测点分七层，每层回答同样两个问题：
 
 | 层 | 检测点 | 抛出的类型 | 是否置脏 lane | 能否靠重建恢复 |
 | --- | --- | --- | --- | --- |
@@ -32,7 +50,15 @@ outline: [2, 3]
 | `kFlushed` | `IBV_WC_WR_FLUSH_ERR` | QP 已死，WR 被冲掉 | true |
 | `kOther` | 其余 | 未知 | false |
 
-五类里只有 `kPeerUnreachable` 和 `kFlushed` 值得重建。另外三类重建治不了，异常就保留原始的 `RawVerbsCompletionException`，不包装成「分片不可达」。
+五类里只有两类值得重建：对端不回 ACK，和队列已死、请求被冲掉。另外三类重建治不了——异常会保留网卡给的原始类型，不包装成「分片不可达」。
+
+| 完成状态 | 要不要重建 | 为什么 |
+| --- | --- | --- |
+| 对端不再 ACK | 要 | 连接确实断了，重建能换一条 |
+| 队列已死、请求被冲掉 | 要 | 同上，只能重置重来 |
+| 对端应答但拒绝 | 不要 | 换条连接还是会拒，说明请求本身不合法 |
+| 本地长度或权限错 | 不要 | 是调用方参数问题，重建一次错一次 |
+| 其余未知 | 不要 | 没有证据说明重建有用 |
 
 重试本身分了四层，但只有一层是真的重试：
 
@@ -57,7 +83,18 @@ outline: [2, 3]
 
 ## 代码位置
 
-**置脏入口**：`PetPSClient::MarkLaneDirty(qp_index, reason, snapshot, waited_ms, rebuildable)` 是唯一入口。调用点报四种原因：`wait_timeout`、`health_dead`、`drain_timeout` 三者报 `rebuildable=true`，`cq_harvest_exception` 报 `rebuildable=false`。设备层的错误先进 `FailLaneOnCompletionError`，由它按完成状态分类后再决定要不要置脏。
+要改代码时再看这里。
+
+**置脏入口。** 只有一个函数 `PetPSClient::MarkLaneDirty(qp_index, reason, snapshot, waited_ms, rebuildable)`，参数里的 `rebuildable` 决定这条 lane 还能不能救。四类原因各报各的：
+
+| 原因 | 上报的 `rebuildable` |
+| --- | --- |
+| `wait_timeout` | `rebuildable=true` |
+| `health_dead` | `rebuildable=true` |
+| `drain_timeout` | `rebuildable=true` |
+| `cq_harvest_exception` | `rebuildable=false` |
+
+设备层的错误不直接置脏，先由 `FailLaneOnCompletionError` 按完成状态分类，再决定。
 
 **槽位状态回滚**：`SlotContext::busy` 与 `pending_rpcs_` 是两套簿记，失败时的处理并不对称。
 
@@ -65,7 +102,13 @@ outline: [2, 3]
 - `RevokeRPCResource` 对 `failed` 条目跳过 `ClearRequestSlot`，因为该槽位可能已经被新请求复用，清零会破坏新请求的提交字。
 - 脏 lane 上的槽位一律不归还（日志键 `revoke_skipped_dirty_lane`）：服务端可能还在读请求 载荷，或者 完成事件 还会晚到。
 
-**其余符号**：`ClassifyRawVerbsCompletionStatus` 与 `IsRawVerbsUnreachableError` 在 `raw_verbs_transport.h`。等待循环里的健康探测与 完成事件 收割在 `petps_client.cc#PetPSClient::WaitForStatusWord`。慢路径探测的节流与缓存分别在 `control_plane.h#RdmaSlowPathProbeGate` 和 `petps_client.cc#MaybeProbeShardHealth`。
+**其余符号。**
+
+| 想知道什么 | 去哪看 |
+| --- | --- |
+| 完成状态怎么归类 | `raw_verbs_transport.h#ClassifyRawVerbsCompletionStatus`、`#IsRawVerbsUnreachableError` |
+| 等待期间怎么探测健康、怎么收割完成事件 | `petps_client.cc#PetPSClient::WaitForStatusWord` |
+| 慢路径探测的节流与缓存 | `control_plane.h#RdmaSlowPathProbeGate`、`petps_client.cc#MaybeProbeShardHealth` |
 
 ## 交付一句
 

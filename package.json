@@ -7,7 +7,10 @@
   "scripts": {
     "dev": "vitepress dev docs",
     "build": "vitepress build docs",
-    "preview": "vitepress preview docs"
+    "preview": "vitepress preview docs",
+    "check:prose": "node scripts/prose-check.mjs",
+    "check:tokens": "node scripts/token-check.mjs",
+    "check:tables": "node scripts/table-check.mjs"
   },
   "devDependencies": {
     "pele": "^1.13.0",

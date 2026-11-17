@@ -9,6 +9,8 @@ outline: [2]
 这份表解决一个具体问题：你手上有个改动，不知道从哪读起。左列是仓库里的位置，
 右列是讲它的那一块。路径相对仓库根目录，符号用 `#` 分隔。
 
+这页是查表用的，不是用来读的：按目录扫，找到你的改动落在哪一格，再跳过去。
+
 ::: tip 这里没有代码副本
 本站不 vendor RecStore，也不拉 `third_party` 子模块——仓库里只有文档。
 需要跳过去看源码时，用上游 [RecStore/RecStore](https://github.com/RecStore/RecStore)，

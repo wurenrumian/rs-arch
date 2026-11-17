@@ -4,23 +4,60 @@ description: 配置文件、环境变量与 gflags 的组合，两端各自解�
 outline: [2, 3]
 ---
 
+这页是查表用的：一份 JSON 配置、一批环境变量、几个 C++ gflags 决定运行时行为。下面先画配置从文件到生效的走法，再把字段按块摊成表。
+
 ## 它是什么
 
-一套"配置文件 + 环境变量 + 少量 C++ gflags"的组合。没有统一的配置对象，服务端和客户端各自按自己的顺序解析同一份 JSON。
+没有统一的配置对象：服务端和训练进程读同一份 JSON，但读文件的路径不同，缺字段时的脾气也不同——有的直接抛，有的静默回退常量，有的先拿上级块的值复制一份。举例，同一份配置里传输类型缺省走 gRPC、端口缺省 15000、共享内存区名缺省 recstore_local_ps，三条默认值分别写在三处。
+
+```mermaid
+flowchart TD
+  A["一份 JSON 配置"] -->|"服务端 先看命令行指定"| B["命令行两个参数 依次探测"]
+  A -->|"训练进程 先看环境变量"| C["环境变量路径"]
+  B -->|"都不存在就跳过"| D["退回向上查找 逐级找同名文件"]
+  C -->|"变量没设"| D
+  C -->|"指的文件不存在"| E["异常被吞成空配置"]
+  D -->|"找到就整份解析"| F["解析成内存对象 交给各块"]
+  F -->|"按块各取所需"| G["服务端 选传输类型与存储引擎"]
+  F -->|"按块各取所需"| H["客户端 补默认值再建连接"]
+  G -->|"启动后每个请求"| I["运行期 按字段选分支"]
+  H --> I
+```
+
+上面两层是两条读文件路径，其余是读完之后谁在用。决定用哪个文件这件事全部发生在进程启动、第一行业务逻辑之前；中间那个节点之后，热路径上的请求不再读盘，只有重建客户端的那两个入口会重新读一次文件。最后一个节点才是运行时的：字段在启动时被取一次，之后每个请求照着那个值选分支。
 
 ## 它为什么存在
 
-默认值分散在三处：JSON schema 的缺省、C++ 里的短期缺省、gflags 的初值。三者不一致时，表现是"配置写了但没生效"。这一块把归属摊开，省掉对照源码猜的时间。
+默认值分散在三处：JSON schema 的缺省、C++ 里的短期缺省、gflags 的初值。三者不一致时，表现是配置写了但没生效，而且多半不报错——只有必填字段缺失才失败，可选字段一律静默回退。把归属摊开，省掉对照源码猜的时间。
 
 ## 它和谁接
 
-上游是第 5 块编出来的二进制，下游是第 3、4 块里那些"按配置选分支"的调用点。第 02 章会从计算层角度再列一遍它真正读取的字段。
+上游是第 5 块编出来的二进制；下游是第 3、4 块里按配置选分支的调用点：传输类型决定建哪个单分片客户端，分片数决定路由，存储引擎类型决定整条存储栈。第 02 章会从计算层角度再列一遍它真正读取的字段。
 
 ## 代码位置
 
-**查找顺序。** 服务端（`src/ps/ps_server.cpp#main`）只用三个来源：`--config_path`（文件不存在则忽略）→ `--brpc_config_path`（同样先探测存在性）→ `base::ResolveRecStoreConfigPath()`（从 CWD 逐级向上找 `recstore_config.json`，再退回仓库根同名文件，都没有则报错、退出码 1）。`RECSTORE_CONFIG` 不是服务端来源：它只影响客户端 `GetGlobalConfig()`（`RECSTORE_CONFIG` 指向的文件若不存在会抛，随后被吞成空配置，见风险 3）与 Python/测试启动脚本（脚本把它转成 `--config_path`）。客户端另一个入口 `GetGlobalConfig()` 与 `ResolveRecStoreConfigPath` 共用同一套目录搜索。
+要改代码时再看这里。
 
-**按块归属**（只列真正生效的字段，默认值取自代码；完整字段见 `docs/config.md`）：
+### 查找顺序
+
+服务端入口在 `src/ps/ps_server.cpp#main`，它只用三个来源，前两个先探测文件是否存在：
+
+| 顺序 | 来源 | 不存在时 |
+| --- | --- | --- |
+| 1 | `--config_path` | 文件不存在则忽略，看下一项 |
+| 2 | `--brpc_config_path` | 同样先探测存在性 |
+| 3 | `base::ResolveRecStoreConfigPath()` | 从 CWD 逐级向上找 `recstore_config.json`，再退回仓库根同名文件，都没有则报错、退出码 1 |
+
+客户端按另一个顺序：
+
+| 项 | 说明 |
+| --- | --- |
+| 入口 | `GetGlobalConfig()` |
+| 环境变量 | `RECSTORE_CONFIG`，优先级高于目录搜索；指向的文件若不存在会抛，随后被吞成空配置（见风险 3） |
+| 目录搜索 | 与 `ResolveRecStoreConfigPath` 共用同一套 |
+| 不是服务端来源 | `RECSTORE_CONFIG` 只影响客户端与 Python/测试启动脚本（脚本把它转成 `--config_path`） |
+
+### 按块归属（只列真正生效的字段，默认值取自代码；完整字段见 `docs/config.md`）
 
 | 块 | 谁读 | 字段与默认 |
 | --- | --- | --- |
@@ -33,11 +70,25 @@ outline: [2, 3]
 | `value.tiering` | `TIERED_VALUE_STORE` | `cache_policy` 缺省 `none`，接受 `none`/空、`lru`、`clock`、`adaptive`；`cache_budget_ratio=0.05` ∈ (0,1]（仅 LRU）；`cache_shards=16` ∈ [1,4096]；`promote_min_misses=2` ≥ 1；`expected_dram_bytes=0`；`retain_backing_copies=true`；CLOCK 另有 `clock_{frequency_admission,cost_aware,async_exchange}` 与两个队列上限；`dram_keys_path` 与 CLOCK 互斥，`online_admission=false`，`async_admission=false`（后者要求前者，且要求名单非空、plain SSD 布局）；非法值抛 `std::invalid_argument` |
 | `observability` | `report()` | `sinks` 列表（`remote`/`csv`/`jsonl`/`glog`/`none`，缺省只开 `glog`）；`remote.endpoint/timeout_ms/queue_max`、`csv.path/flush_every_n`、`jsonl.path/flush_every_n`；旧的 `report_API` 仍生效但被它覆盖；Python 侧经 `recstore.telemetry.emit()` 进同一批 sink |
 
-**单分片监听地址**（`95616eef`）：服务端不再硬编码 `0.0.0.0:15000`。单分片分支优先取 `cache_ps.servers` 中 `shard == local_shard_id` 的那一项的 `host`/`port`；`local_shard_id` 来自 `--grpc_local_shard_id` / `--local_shard_id`（缺省 `-1`，此时按 shard 0 找）；`servers` 整个缺失时回退 gRPC 的 `0.0.0.0:15000` 或 bRPC 的 `0.0.0.0:<--brpc_server_port>` 并打 `WARNING`；有 `servers` 但缺该 shard、或 `host`/`port` 类型不对时抛异常并 `LOG(FATAL)`。gRPC 解析出的 shard id 还用于 checkpoint 元数据。客户端在同一份配置下也会优先用 `cache_ps.servers`（`ResolveFrameworkDistributedClientConfig` 把缺省字段复制过去），所以两端看到的是同一组端点。
+### 单分片监听地址（`95616eef`）
 
-容易被忽略的两个 C++ gflags：`FLAGS_value_size = 128`（`src/ps/base/config.cc`，RDMA 用它推 embedding_dim）与 `FLAGS_max_kv_num_per_request = 300`（RDMA 路径的单请求上限）。
+| 情形 | 行为 |
+| --- | --- |
+| 有 `servers` | 服务端不再硬编码 `0.0.0.0:15000`：单分片分支优先取 `cache_ps.servers` 中 `shard == local_shard_id` 的那一项的 `host`/`port` |
+| 分片号从哪来 | `local_shard_id` 来自 `--grpc_local_shard_id` / `--local_shard_id`（缺省 `-1`，此时按 shard 0 找） |
+| `servers` 整个缺失 | 回退 gRPC 的 `0.0.0.0:15000` 或 bRPC 的 `0.0.0.0:<--brpc_server_port>` 并打 `WARNING` |
+| 有 `servers` 但缺该 shard，或 `host`/`port` 类型不对 | 抛异常并 `LOG(FATAL)` |
+| checkpoint | gRPC 解析出的 shard id 还用于 checkpoint 元数据 |
+| 客户端 | 在同一份配置下也会优先用 `cache_ps.servers`（`ResolveFrameworkDistributedClientConfig` 把缺省字段复制过去），所以两端看到的是同一组端点 |
 
-环境变量按层归类：
+容易被忽略的两个 C++ gflags：
+
+| gflag 定义 | 位置与用途 |
+| --- | --- |
+| `FLAGS_value_size = 128` | `src/ps/base/config.cc`，RDMA 用它推 embedding_dim |
+| `FLAGS_max_kv_num_per_request = 300` | RDMA 路径的单请求上限 |
+
+### 环境变量按层归类
 
 | 变量 | 作用 | 读取位置 |
 | --- | --- | --- |
@@ -51,4 +102,4 @@ outline: [2, 3]
 
 ## 交付一句
 
-第 6 块到此为止：配置写到哪、从哪读、谁真正用了它，都在表里。术语定义见章末附录。
+第 6 块到此为止：文件怎么找、字段谁读、默认值归谁，都在表里。术语定义见章末附录。

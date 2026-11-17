@@ -4,19 +4,48 @@ description: 计算层配置分四层：构造参数、环境变量、构建宏�
 outline: [2, 3]
 ---
 
+这一页是查表用的。计算层不认"服务器怎么配"，只认四类输入；要确认某个开关改了有没有用、什么时候生效，按下面的层去找，不用从头读。
+
 ## 它是什么
 
-计算层的配置分四层：模型与优化器的构造参数、环境变量、构建宏、配置文件里真正被读的字段。生效时机不同：宏在编译期定死，参数在对象构造时定，环境变量在进程启动或首次调用时读，配置文件在 op 首次使用时解析。
+配置分四层，生效时机一层比一层晚：
+
+| 层 | 什么时候定下来 | 改法 |
+| --- | --- | --- |
+| 构建宏 | 编译期 | 换编译选项重编 |
+| 构造参数 | 模型或优化器构造时 | 改训练脚本 |
+| 环境变量 | 进程启动或首次调用时 | 改启动命令后重启 |
+| 配置文件 | op 首次使用时解析 | 改 JSON 后重启进程 |
+
+后两层看起来能随时改，其实都只在启动阶段读一次；进程跑起来之后改文件、改环境变量都不会生效。
+
+配置文件里的键也不是都归计算层。真正有人在读的只有五组，读它们的是三个地方：C++ 侧建客户端时、Python 优化器构造时、传输层自己。
+
+| 键组 | 谁在读 | 什么时候 |
+| --- | --- | --- |
+| 后端类型 | C++ 侧建客户端 | op 首次使用 |
+| 稀疏优化器参数 | Python 优化器构造时校验，服务端执行 | 构造时 |
+| 分片四件套 | 分片客户端 | 建客户端时 |
+| 单点客户端地址 | 单点客户端 | 重建时 |
+| 共享内存槽池 | 共享内存客户端 | 建客户端时 |
+
+分片那组还有一条回退：缺的字段会从服务端那节抄过来；完全没有分片清单时，gRPC 与 bRPC 会合成一个单分片客户端，而不是报错。
+
+其余配置——比如存储引擎和 value store——计算层本身不读，它们属于[第 05 章](../ch05/)。所以"这台机器怎么配"和"计算层读什么"是两张表，别拿一张当另一张。
 
 ## 它为什么存在
 
-计算层不理解"服务器怎么配"，它只关心三件事：走哪个后端、分片怎么路由、缓存与流水的参数是多少。把这三件事和传输层配置混在一张表里，会让人误以为改一个字段就能换传输。
+计算层只关心三件事：走哪个后端、分片怎么路由、缓存与流水的参数是多少。这三件事和传输层、存储层的配置混在一张表里，最容易出的误会是"改一个字段就能换传输"——其实换后端要同时满足后端类型、分片清单和对应的槽池，改一处通常不够。
+
+分层也是失败的来源。宏没开时，相关能力要么返回 false、要么直接抛断言；参数写错在构造时就抛；环境变量拼错则安静地回落到默认值。知道每一层怎么失败，比记住字段名更有用。
 
 ## 它和谁接
 
-上游是[第 01 章](../ch01/)的配置解析顺序（服务端与客户端各一套），下游是[第 3 块](./read-path)、[第 4 块](./write-path)、[第 5 块](./bagpipe)、[第 6 块](./pipeline)里读参数的地方。
+上游是[第 01 章](../ch01/)的配置解析顺序，服务端与客户端各一套。下游是所有读参数的地方：[第 3 块](./read-path)的读策略、[第 4 块](./write-path)的提交、[第 5 块](./bagpipe)的容量、[第 6 块](./pipeline)的开关。
 
 ## 代码位置
+
+要改代码时再看这里。
 
 Python 参数（模型/优化层）：
 
@@ -42,19 +71,30 @@ Python 参数（模型/优化层）：
 | `RECSTORE_PS_DEVICE_MERGE` / `RECSTORE_PS_OWNER_GPU` | `ps_pipeline/pipeline.py`、`owner.py#owner_options_from_env` | 前者在 GPU 上合并 clean/dirty 行，后者启用 world-2 GPU owner 路径 |
 | `RECSTORE_SPARSE_COMMIT_PROFILE` | `ps/base/sparse_gradient_commit.h` | 打印 `component=sparse_commit event=runtime_phase` 阶段耗时 |
 
-构建宏：`RECSTORE_ENABLE_GPU_CACHE` 编译 `gpu_cache_adapter.cu` 与 cache bindings（未定义时 `enable_gpu_cache` 返回 false，查询类 op 直接 `TORCH_CHECK(false)`）；`USE_FAKE_KVCLIENT` 用 `common/op_mock.cc` 替换整份 `op.cc`，提供内存 KV；`ENABLE_PERF_REPORT` 打开 `op_latency` / `embread_stages` / `embupdate_stages` 上报与 flame graph。
+构建宏：
+
+| 宏 | 效果 |
+| --- | --- |
+| `RECSTORE_ENABLE_GPU_CACHE` | 编译 `gpu_cache_adapter.cu` 与 cache bindings；未定义时 `enable_gpu_cache` 返回 false，查询类 op 直接 `TORCH_CHECK(false)` |
+| `USE_FAKE_KVCLIENT` | 用 `common/op_mock.cc` 替换整份 `op.cc`，提供内存 KV |
+| `ENABLE_PERF_REPORT` | 打开 `op_latency` / `embread_stages` / `embupdate_stages` 上报与 flame graph |
 
 配置文件里计算层真正读取的字段：
 
 | 字段 | 默认 | 计算层效果 |
 | --- | --- | --- |
-| `cache_ps.ps_type` | `"GRPC"` | `ResolveFrameworkPSClientType` 决定构造哪个 `BasePSClient`；额外接受 `RDMA`、`LOCAL_SHM`、`hierkv` |
+| `cache_ps.ps_type` | `"GRPC"` | `ResolveFrameworkPSClientType` 决定构造哪个 `BasePSClient`；可取 `GRPC`、`BRPC`、`RDMA`、`LOCAL_SHM`。`hierkv` 由更上层的后端名解析先拦下，也能用 |
 | `cache_ps.optimizer.{type,learning_rate,epsilon,beta1,beta2,weight_decay}` | SGD / 0.01 / 1e-10 | Python 优化器构造时校验；服务端真正执行 |
 | `distributed_client.{servers,num_shards,hash_method,max_keys_per_request}` | 无 / 无 / `city_hash` / 500 | 分片客户端路由；`max_keys_per_request` 影响单次 RPC 行数 |
 | `client.{host,port,shard}` | `127.0.0.1:15000` | `set_ps_config` 重建单点客户端 |
 | `local_shm.{region_name,slot_count,slot_buffer_bytes,client_timeout_ms}` | `recstore_local_ps` / 64 / 8 MiB / 30000 | slot 池大小决定 batch 上限与 `local_update_flat` 的单次行数 |
 
-**关于 `RecStoreConfig` / `client_options`**：代码里没有名为 `RecStoreConfig` 的 Python 类，也没有 `client_options` 对象；等价的 Python 配置是 `model_zoo/rs_demo/config.py#RunConfig`，等价的 C++ 配置是 `src/ps/client_options.h#PSClientCreateOptions`。
+还有两个名字在代码里并不存在，别照着搜：
+
+| 常见叫法 | 实际对应 |
+| --- | --- |
+| `RecStoreConfig` | 没有这个 Python 类；等价物是 `model_zoo/rs_demo/config.py#RunConfig` |
+| `client_options` | 没有这个对象；C++ 侧等价物是 `src/ps/client_options.h#PSClientCreateOptions` |
 
 ## 交付一句
 

@@ -4,17 +4,34 @@ description: 三条完整训练路径与一批早期脚本，各自接入 RecSto
 outline: [2, 3]
 ---
 
+目录里有九个训练入口，但接不接 RecStore 与文件名无关。这一页按「用哪套接口」分成三类。
+
 ## 它是什么
 
-除主入口外，仓库里还有三条完整训练路径和一批早期脚本。接入程度差别很大：有的走自研 embedding 模块，有的只做对照，有的与 RecStore 无关。
+想复现一组 DLRM 对照实验，会看到两个几乎同名的脚本（举例）：一个把稀疏表放在 RecStore 上，一个用原生分片规划器把表切在进程内。按名字挑容易挑错，差别在导入的模块。
+
+这几个示例各自用哪套接口？
+
+```mermaid
+flowchart LR
+  A["主参考实现 三种后端"] -->|"调用"| R["RecStore 模块与稀疏优化器"]
+  A -->|"调用"| O["原生 TorchRec 与 HPS 模块"]
+  B["TorchRec 自研路径"] -->|"调用"| R
+  C["TensorFlow 路径"] -->|"调用"| T["只调读与更新 没有优化器"]
+  D["对照路径与早期脚本"] -->|"调用"| N["原生模块 不进 RecStore"]
+```
+
+左边三条都进 RecStore，但方式不同：主参考实现一套代码带三种后端，同时连两处；自研路径只连 RecStore；TensorFlow 那条没有优化器抽象，在 Keras 层自己写梯度。最下面那条导入时就没有 RecStore。
+
+TensorFlow 那条要先编出算子库，缺了运行时就加载失败；其余几套只是 Python 导入，走哪套后端由运行时决定。
 
 ## 它为什么存在
 
-对外演示需要"同一份数据、两种后端"的对照，也需要覆盖 TorchRec 与 TensorFlow 两种生态。这带来一个副作用：同名脚本的接入状态不一致，读者容易按文件名的字面意思误判。
+对外演示要同一份数据的两种后端对照，也要覆盖 TorchRec 与 TensorFlow 两个生态，所以仓库里既有走 RecStore 的路径，也有故意不接的对照路径——它看起来像没接成功，其实是设计如此。副作用是接入状态不一致：有的入口导入修好了却不被调用，有的注释写着接入了，代码里没有。
 
 ## 它和谁接
 
-它们上接各自的训练脚本入口，下接同一套 Python 绑定；共享的是 embedding 模块与稀疏优化器，不共享训练循环。
+它们上接各自的训练脚本入口，下接同一套 Python 绑定，共享 embedding 模块与稀疏优化器。九个入口：
 
 | 模型 / 例子 | 入口 | 接 RecStore？ | 备注 |
 | --- | --- | --- | --- |
@@ -28,14 +45,17 @@ outline: [2, 3]
 | `examples/distributed_dlrm_training.py` | `python examples/...` | 否 | 原生 EBC，注释称接入 RecStore，实际没有；`sys.path` 硬编码作者机器路径 |
 | `src/executable/*` | `perf_emb.py` 等 | 部分 | 早期性能脚本，依赖 `pyinstrument`/`debugpy`，不在 CI 与基准驱动里 |
 
-`torchrec_kv/` 只提供被复用的 embedding 模块本体（`EmbeddingBag.py`、`EmbeddingCollection.py`、`fused_preload.py`），不含训练循环；`recstore.__init__` 通过 `__getattr__` 懒加载 `RecStoreEmbeddingBagCollection`。TF 侧 `client.py` 默认加载 `build/lib/lib_recstore_tf_ops.so`，路径相对仓库根解析。
+被复用的那套模块本体不含训练循环，所以换后端只换模块来源。TensorFlow 侧从构建产物目录取算子库（默认 `build/lib/lib_recstore_tf_ops.so`）。
 
 ## 代码位置
+
+要改代码时再看这里。
 
 - `model_zoo/torchrec_dlrm/run_single_day.sh` — `CUSTOM_SCRIPT` / `TORCHREC_SCRIPT` 的选择。
 - `model_zoo/torchrec_dlrm/tests/dlrm_main_single_day.py`、`#dlrm_main_torchrec_single.py` — 两条对照路径。
 - `model_zoo/criteo_kaggle/README.md`、`#bench_compare.py`、`#start_rdma_ps.py` — 两套入口与短步驱动。
 - `model_zoo/tensorflow_dlrm/recstore_embedding_layer.py`、`#client.py` — TF 绑定。
+- `src/python/pytorch/torchrec_kv/EmbeddingBag.py`、`#EmbeddingCollection.py`、`#fused_preload.py` — 被复用的模块本体，不含训练循环；顶层 `recstore.__init__` 用 `__getattr__` 懒加载入口类。
 
 ## 交付一句
 

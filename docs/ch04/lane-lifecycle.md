@@ -56,7 +56,12 @@ RC 连接一旦进错态就没法原地恢复，只能 reset 重建。麻烦在�
 
 ## 代码位置
 
-**重建入口**：客户端在 `AcquireIdleSlot` 里做那四个条件的检查。开关是 `--rdma_lane_rebuild_enabled`，预算上限是 `--rdma_lane_rebuild_max_attempts`。
+**重建入口。** 客户端在下一次取槽位时做那四个条件的检查，没有后台线程来主动打扫。两个开关各管一件事：一个允许不允许重建，一个给预算上限。
+
+| 开关 | 管什么 |
+| --- | --- |
+| `--rdma_lane_rebuild_enabled` | 允不允许重建，默认关 |
+| `--rdma_lane_rebuild_max_attempts` | 预算上限，默认 3 次 |
 
 **客户端握手**（`RcShardClientTransport::RebuildLane`，全程持 `impl_->cq_mutex`）：
 
@@ -67,7 +72,13 @@ RC 连接一旦进错态就没法原地恢复，只能 reset 重建。麻烦在�
 5. 在 `--rdma_lane_rebuild_wait_ms`（默认 2000）内轮询 `RefreshPeerMeta`，只要对端满足 `lane_generation > server_baseline` 就算 ACK。每次 RPC 用剩余预算做超时，避免 30 s 的控制面 deadline 把数据面拖死。
 6. 成功后 `TryRebuildLaneLocked` 收尾：释放该 lane 的所有槽位、把该 lane 上 `pending_rpcs_` 全部标 `failed`、`epoch++`、清 `dirty/rebuildable`、`InvalidateVerdict()`。
 
-**服务端对称路径**：`PollClientRebuildRequests` → `RebuildClientLaneIfStale`。轮询线程按 `qp_index` 归属扫描，读客户端元数据，发现 `lane_generation` 变了就 `response_epoch++`、`RebuildQp`、清响应完成标记，再自增并发布自己的世代当 ACK。空闲时轮询间隔从 50 ms 指数退避到 500 ms（`MaybePollClientRebuilds`），重建成功即复位。
+**服务端对称路径。** 服务端不主动重建，它等客户端报。轮询线程按 `qp_index` 归属扫描，读客户端元数据；发现对方的世代变了，就自增响应世代（`response_epoch++`）、重建队列对、清掉响应完成标记，再发布自己的新世代当作应答。空闲时轮询间隔从 50 ms 指数退避到 500 ms，重建成功即复位。
+
+| 角色 | 位置 |
+| --- | --- |
+| 扫描与重建 | `PollClientRebuildRequests`、`RebuildClientLaneIfStale` |
+| 退避轮询 | `MaybePollClientRebuilds` |
+| 世代字段 | `lane_generation`、`response_epoch` |
 
 **`num_os_clients != 1` 时两端都直接拒绝重建**：服务端一条 lane 的 CQ 上挂着多个客户端进程的 QP，reset 之后没法只 drain 自己的完成，一 drain 就丢别人的 完成事件。这是显式取舍，不是遗漏。
 

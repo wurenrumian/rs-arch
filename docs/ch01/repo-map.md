@@ -4,19 +4,55 @@ description: 一套三段式代码：训练进程、服务进程、存储，目�
 outline: [2, 3]
 ---
 
+这一页回答一个很具体的问题：想改的东西在哪个目录。先看一次读写会碰到哪几块，再看这些块分别由哪个目录实现，最后才是查表。
+
 ## 它是什么
 
-一套三段式代码：训练进程、服务进程、存储。目录按语言和职责切，与这三段并不一一对应。C++ 主体在 `src/`，Python 包源码在 `src/python/pytorch/`，可运行样例在 `model_zoo/`，外围工具在 `tools/`，第三方依赖在 `third_party/`，文档站在 `docs/`，过程性材料（状态板、journal、本讲解）在 `tmp/`。
+举例：一个 batch 4096 条样本、每条 20 个特征，前向一次要找约 8 万行 embedding；反向传播再把同样量级的梯度碎片交回来。这 8 万行不会一行一行地走完网络，但它们要经过的代码块是固定的八个。
+
+一次读写会碰到哪几块？
+
+```mermaid
+flowchart TB
+  subgraph TRAIN["训练进程"]
+    A["样例模型 交出 key"] --> B["Python 客户端 归一化与编码"]
+    B --> C["op 运行时 判缓存"]
+    C --> D["分片层 按 key 选分片并切块"]
+    D --> E["单分片客户端 发出这一块"]
+  end
+  subgraph SERVE["服务进程"]
+    F["服务实现 接住这一块"] --> G["缓存编排 逐行取"]
+    G --> H["存储引擎 索引加值存储"]
+  end
+  E -->|"跨进程 走 RPC 或共享内存"| F
+  H -.->|"行数据 沿原路返回"| C
+```
+
+读图：上半边五块都在训练进程里，箭头是普通函数调用；只有从单分片客户端到服务实现那一根是真的跨进程。下半边三块也在同一个进程里，从服务实现到存储引擎是本地调用，只是类型上过了一层抽象。回程虚线不是新请求，是同一批行数据被搬回来。
 
 ## 它为什么存在
 
-读这一章的人通常带着一个具体目的：改某个后端、加一个 op、或者只想把项目编出来。不知道哪一层归哪个目录，改动就会落在错误的位置——比如把"读路径的分支选择"当成 C++ 的事去找，会在 `src/framework` 里绕很久，而它其实在 Python 的策略层。
+读这一章的人通常带着一个具体目的：改某个后端、加一个 op，或者只想把项目编出来。目录按语言和职责切，与那八个代码块并不一一对应，所以「找模块」不能按「找层」来。举例：有人把读路径的分支选择当成 C++ 的事去找，会在框架目录里绕很久，而它其实在 Python 的策略层；反过来，想改「一批 key 怎么分片」找到模型代码上，也会白找。
+
+构建是另一套顺序：编译入口按顺序依次加入九个目录，最后那个显存实验入口只在 CUDA 可用时才加入。
+
+编一次二进制，先编哪块、哪些目录不在链上？
+
+```mermaid
+flowchart LR
+  B1["基础"] --> B2["传输"] --> B3["内存"] --> B4["存储"] --> B5["优化器"] --> B6["基准"] --> B7["测试"] --> B8["框架"]
+  B8 -->|"仅 CUDA 可用时"| B9["显存实验入口"]
+```
+
+读图：箭头表示 CMake 的处理顺序，后面的目录可以直接用前面已定义的 target，反过来不行；它和运行时谁调谁无关。前八个名字对应上表里的八个一级目录，其中「传输」指的是参数服务器那个目录；最后那个显存实验入口是可选的实验可执行。链上没有的两个目录——显存工具和一个只有头文件的优化辅助目录——编不进主二进制；Python 包则由另一条打包流程单独构建。
 
 ## 它和谁接
 
-第 2 块的三层调用链画在这张地图上；第 3、4 块里每个步骤都能对应回这里的一个模块；第 5 块的构建入口就是下面那张 `add_subdirectory` 顺序表。
+第 2 块把这条链按进程边界重新画一遍；第 3、4 块里每个步骤都能对回这里的一个模块；第 5 块的构建入口就是代码位置里那条顺序。图上八块之外，观测、基准、测试这些目录不参与一次读写，只在验证和调优时出现。
 
 ## 代码位置
+
+要改代码时再看这里。
 
 顶层目录：
 
@@ -44,12 +80,45 @@ outline: [2, 3]
 | `src/optimization` | 只有头文件 `bagpipe/cache_metadata.h`，无独立 CMakeLists，被 `framework/pytorch/cache/bagpipe_bindings.cc` 包含 | `optimization::bagpipe::CacheMetadata` |
 | `src/optimizer` | 服务端稀疏优化器与 key tag 键空间 | `Optimizer`、`SGD`、`RowWiseAdaGrad`、`AdamW`、`MakeTensorTag` |
 | `src/ps` | 参数服务器全部传输与协议：`base/`（抽象、`CachePS`、单分片监听端点解析 `shard_endpoint.h`）、`proto/`、`grpc/`、`brpc/`、`rdma/`、`local_shm/`、`python_client/`（遗留） | `BasePSClient`、`DistributedShardedClient`、`CreatePSClient`、`SelectSingleShardEndpoint`、`ps_server` |
-| `src/python` | Python 包源码与 CMake 版本模板 | `RecStoreClient`、`_ensure_native_loaded`、`version_info.py.in` |
+| `src/python` | `src/python/pytorch/` 是 Python 包源码，另有 CMake 版本模板 | `RecStoreClient`、`_ensure_native_loaded`、`version_info.py.in` |
 | `src/storage` | KV 引擎、索引、值存储（含 CLOCK 分层 `tiered_clock_value_store.h`）、分层读缓存 `cache/`、SSD/NVM、GPU cache kernel、SSD 布局 | `BaseKV`、`KVEngineComposite`、`base::ResolveEngine`、`TieredClockValueStore`、`TieredReadCache`、`ValueStore` |
 | `src/test` | C++/Python 测试与配置样本（`configs/`、`framework/`、`ps/`、`server_mgr/`、`scripts/`） | `test_kvengine.cpp`、`test_shard_endpoint.cpp`、`scripts/check_test_registration.py` |
 
-构建入口的真实关系（`add_subdirectory` 顺序）：`src/CMakeLists.txt` 依次加入 `base`、`ps`、`memory`、`storage`、`optimizer`、`benchmark`、`test`、`framework`，最后在 CUDA 可用时加入 `executable/uvm`。`src/gpu_memory` 与 `src/optimization` **不在**这条链上。最近地图层面的增删（细节归第 05、06 章）：`src/ps/base/shard_endpoint.h`、`src/storage/cache/tiered_read_cache.h`、`src/storage/value_store/tiered_clock_value_store.h`、`tools/benchmarks/perf/` 与 `perf_suite.py`、`tools/benchmarks/run_tiered_cache_sweep.py`、`src/test/scripts/check_test_registration.py`、`src/test/test_shard_endpoint.cpp`、`src/test/test_petkv_unsupported.cpp`、`src/test/test_report.cpp`（不再限 Debug）、`.github/workflows/doc-check.yml` 是新增入口；`src/test/test_ssd_extendible_hash.cpp` 已删除。
+### 构建入口的加入顺序
+
+`src/CMakeLists.txt` 的 `add_subdirectory` 顺序：
+
+| 顺序 | 目录 | 何时加入 |
+| --- | --- | --- |
+| 1 | `base` | 总是 |
+| 2 | `ps` | 总是 |
+| 3 | `memory` | 总是 |
+| 4 | `storage` | 总是 |
+| 5 | `optimizer` | 总是 |
+| 6 | `benchmark` | 总是 |
+| 7 | `test` | 总是 |
+| 8 | `framework` | 总是 |
+| 9 | `executable/uvm` | 仅 `ENABLE_CUDA` 且找到 nvcc |
+
+`src/gpu_memory` 与 `src/optimization` **不在**这条链上。
+
+### 最近的增删
+
+新增入口：
+
+- `src/ps/base/shard_endpoint.h`
+- `src/storage/cache/tiered_read_cache.h`
+- `src/storage/value_store/tiered_clock_value_store.h`
+- `tools/benchmarks/perf/` 与 `perf_suite.py`
+- `tools/benchmarks/run_tiered_cache_sweep.py`
+- `src/test/scripts/check_test_registration.py`
+- `src/test/test_shard_endpoint.cpp`
+- `src/test/test_petkv_unsupported.cpp`
+- `src/test/test_report.cpp`（不再限 Debug）
+- `.github/workflows/doc-check.yml`
+
+已删除：`src/test/test_ssd_extendible_hash.cpp`。细节归第 05、06 章。
 
 ## 交付一句
 
-第 1 块到此为止：你现在能回答"某个东西大概在哪"。下一块接三层调用链，把这张静态地图变成一次调用穿过的层。
+第 1 块到此为止：你现在能回答「某个东西大概在哪」。下一块接三层调用链，把这张静态地图变成一次调用穿过的层。
