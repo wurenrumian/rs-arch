@@ -48,5 +48,5 @@ outline: [2, 3]
 
 - [第 02 章](../ch02/)（计算层 / BagPipe）：Python 侧只通过 `KVClient` 的 `BatchGet`/`BatchPut`/`ApplySgdUpdateFlat`/`SaveCheckpoint` 与 PS 交互；GPU 缓存的驻留与淘汰由第 02 章的 controller 负责，本章只提供 `storage/gpu_cache` 的设备侧表和 `gpu_memory` 的分配器/映射（后者未接入构建）。`tag` 由 `SparseTensor` 拼在 key 高 8 位，存储层只负责还原。
 - [第 03 章](../ch03/)（PS 与传输）：`CachePS` 从 `cache_ps.base_kv_config` 构造 `BaseKV`，并把 `num_threads` 传入；`GetRDMABackingRegion` 依赖 `ValueStore::RDMABackingData/Size`，因此 RDMA 可直接注册 DRAM 池；`HybridValueStore` 只透出 DRAM 子层的 region，读缓存占用的槽也在这块 region 里，而 `clock` 模式下该 region 为空。
-- [第 04 章](../ch04/)（RDMA）：对端内存注册与 slot 协议不在本章；本章只保证 `BackingData()` 是连续的 mmap 区域，注册粒度由传输层决定。tiered 的 `clock` 策略会关闭这条零拷贝路径。
+- [第 04 章](../ch04/)（RDMA）：对端内存注册与槽位协议不在本章；本章只保证 `BackingData()` 是连续的 mmap 区域，注册粒度由传输层决定。tiered 的 `clock` 策略会关闭这条零拷贝路径。
 - [第 06 章](../ch06/)（测试与基准）：`test_kvengine` 用 `AllCombos` 覆盖 3 个 DRAM 索引 × 3 种 value × 3 个分配器，对 SSD 索引组合与重型场景 skip；`test_ssd_static_layout_value_store` 覆盖读缓存提升、写穿透、失效、预算上限、并发读写、CLOCK 交换与四种策略的选择；`test_io_backend` 与 `test_ssd_allocators` 覆盖批 IO 与失败回滚。PS/e2e 基准与 `benchmark/server.py` 的配置模板默认把 `tiering.cache_policy` 设为 `none` 以保持与旧数字可比，`rs_demo` 的 tiered 配置默认 `clock`（主放置交换），所以它的端到端数字默认不具可比性，复现 cache-off 基线要显式传 `none`。

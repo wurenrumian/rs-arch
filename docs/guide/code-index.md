@@ -60,7 +60,7 @@ outline: [2]
 |---|---|---|
 | `src/ps/base` | `BasePSClient`、`CachePS`、单分片监听端点解析 `shard_endpoint.h` | [03 · 分片与路由](/ch03/sharding) |
 | `src/ps/proto` | gRPC 与 bRPC 两份 `.proto`，命令枚举差异在这里 | [03 · 协议与命令](/ch03/protocol) |
-| `src/ps/rdma` | slot 协议、lane、内存注册与重建 | [04](/ch04/) |
+| `src/ps/rdma` | 槽位协议、lane、内存注册与重建 | [04](/ch04/) |
 | `src/ps/local_shm` | POSIX 共享内存环形队列与槽位头 | [03 · local_shm 路径](/ch03/local-shm) |
 | `src/storage/kv_engine` | `base_kv.h`、`engine_composite.h`、`engine_petkv.h`、`engine_factory.h` | [05 · 组合矩阵](/ch05/composite-matrix) |
 | `src/storage/index` | DRAM PetHash、Extendible Hash、SSD 侧索引 | [05 · 索引](/ch05/index-engine) |

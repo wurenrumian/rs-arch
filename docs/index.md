@@ -33,7 +33,7 @@ features:
     link: /ch03/
     linkText: 10 块
   - title: 04 · RDMA 传输深潜
-    details: slot 协议、内存注册、两条 GET 响应模式、lane 重建与错误分层——性能上限和故障边界都在这里。
+    details: 槽位协议、内存注册、两条 GET 响应模式、lane 重建与错误分层——性能上限和故障边界都在这里。
     link: /ch04/
     linkText: 9 块
   - title: 05 · 存储与内存
@@ -73,6 +73,7 @@ RecStore 把推荐模型的稀疏 embedding 表放到训练进程之外：Python
 
 <div class="rs-cards">
   <RsCard to="/guide/" title="这个站怎么读">阅读约定、证据标签、三条按目标划分的路线。</RsCard>
+  <RsCard to="/guide/glossary" title="术语表">每个概念只有一个名字：概念名、一句话定义、对应的代码符号。</RsCard>
   <RsCard to="/guide/code-index" title="代码索引">仓库目录 ↔ 章节的对照表，想改哪里直接跳到对应块。</RsCard>
   <RsCard to="/guide/facts" title="十条核心事实">六章共同核对过的结论，先记住这十条，再看细节。</RsCard>
   <RsCard to="/quality/risks" title="风险总表">15 条按影响面排序的坑：静默补零、无幂等重试、名不副实的持久化。</RsCard>

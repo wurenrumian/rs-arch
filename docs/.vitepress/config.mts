@@ -59,7 +59,7 @@ const ch03: Item[] = [
 
 const ch04: Item[] = [
   { text: '阅读地图', link: '/ch04/' },
-  { text: '1 · 请求 slot 协议', link: '/ch04/slot-protocol' },
+  { text: '1 · 请求槽位协议', link: '/ch04/slot-protocol' },
   { text: '2 · 连接与内存注册', link: '/ch04/connect-mr' },
   { text: '3 · 一次 GET', link: '/ch04/get' },
   { text: '4 · 一次 PUT / UPDATE / INIT', link: '/ch04/put-update-init' },
@@ -107,6 +107,7 @@ const sidebar: Group[] = [
     items: [
       { text: '这个站怎么读', link: '/guide/' },
       { text: '十条核心事实', link: '/guide/facts' },
+      { text: '术语表', link: '/guide/glossary' },
       { text: '代码索引', link: '/guide/code-index' }
     ]
   },

@@ -6,18 +6,22 @@ outline: [2, 3]
 
 ## 一句话
 
-一个批量请求离开训练进程后，先按 key 落到某个 shard，再被切成不超过上限的小块，交给某条传输送到服务端，最后把各分片的返回按原始行序拼回一块张量。三条传输在这条路上的分工一致，差别在编码方式、并发模型、失败怎么暴露，以及能不能做 checkpoint。
+一个批量请求离开训练进程之后，只做四件事：先按 key 找到它属于哪个分片，再切成不超过上限的小块，
+交给某一条传输送到服务端，最后把各分片的返回按原来的行序拼回一块张量。
+
+三条网络传输在这条路上的分工完全一样。它们真正的差别只有四点：数据怎么编码、并发靠什么、
+出错时是报错还是重连、能不能做 checkpoint。
 
 ## 本章覆盖什么
 
-覆盖请求从客户端抽象进入 PS、再交给存储实现之前的那一层：
+本章讲请求从「客户端抽象」进入参数服务器、再交给存储引擎之前的那一层，包含三部分：
 
-- PS 抽象与核心逻辑：`base_client.h`、`base_ps_server.h`、`cache_ps_impl.h`、`parameters.*`、`Postoffice.*`、`sparse_gradient_commit.h`、`config.*`。
-- 客户端工厂与选型：`client_factory.*`、`client_options.h`、`framework/common/ps_client_config_adapter.cc`、`ps_server.cpp`。
-- 协议：`proto/ps.proto`、`proto/ps_brpc.proto` 的命令与载荷位置。
-- 三条传输与横切面：gRPC、bRPC、local_shm，以及分片路由、批拆分/合并、checkpoint、失败与降级。
+- 参数服务器的抽象与核心逻辑：请求怎么定义、表怎么建、梯度怎么提交。
+- 客户端工厂与选型：训练进程最后拿到哪个客户端，为什么要分两层。
+- 协议、三条传输与横切面：gRPC、bRPC、local_shm，以及分片路由、批拆分、checkpoint、失败处理。
 
-不在范围：RDMA 传输内部（`ps/rdma/*`）见[第 04 章](../ch04/)；`BaseKV` 引擎与 checkpoint 文件格式见[第 05 章](../ch05/)；Python 侧 `DistEmb`/`EmbBag` 与训练循环见[第 02 章](../ch02/)。
+不在本章范围：RDMA 传输内部见[第 04 章](../ch04/)；KV 引擎与 checkpoint 文件格式见[第 05 章](../ch05/)；
+Python 侧的 `DistEmb` / `EmbBag` 与训练循环见[第 02 章](../ch02/)。
 
 ## 6 个部件
 
@@ -26,7 +30,7 @@ outline: [2, 3]
 | 1 | [请求形状](./request-shape) | 一个请求里装了什么，两端对它的格式有哪些硬约定 |
 | 2 | [客户端栈与选型](./client-stack) | 训练进程拿到哪个客户端，为什么单机部署也要经过分片层 |
 | 3 | [协议与命令](./protocol) | 两份协议文件各自能表达什么，哪些能力在其中一份里根本不存在 |
-| 4 | [分片与路由](./sharding) | key 怎么落到 shard，请求怎么部署成进程 |
+| 4 | [分片与路由](./sharding) | key 怎么落到分片，请求怎么部署成进程 |
 | 5 | [三条传输](./common-skeleton) | gRPC、bRPC、local_shm 的共同骨架与各自的差异 |
 | 6 | [一致性与 checkpoint](./consistency) | 写入顺序、去重、checkpoint 能力与失败边界 |
 
@@ -34,28 +38,40 @@ outline: [2, 3]
 
 ## 它们怎么串起来
 
-按编号走一遍。调用方交来表名、key 与值或梯度（1）；选型结果决定用哪个客户端、是否套上分片层（2）；客户端把请求编码成两份协议之一里的命令（3）；分片层按 hash 把 key 分到 shard，并在 shard 内二次切块（4）；单分片客户端用 gRPC、bRPC 或共享内存把块送出去、把结果收回来（5）；写路径最后由去重与 checkpoint 规则收口（6）。反向也成立：任何一条线上现象，都能落回这条链上的某一段。
+按编号走一遍，一次读写会依次经过这六处：
+
+1. 调用方交来表名、key，以及值或梯度（第 1 块）。
+2. 选型结果决定用哪个客户端，以及要不要套上分片层（第 2 块）。
+3. 客户端把请求编码成两份协议之一里的命令（第 3 块）。
+4. 分片层按哈希把 key 分到分片，再在分片内按上限切块（第 4 块）。
+5. 单分片客户端用 gRPC、bRPC 或共享内存把块送出去、把结果收回来（第 5 块，占四页）。
+6. 写路径最后由去重与 checkpoint 规则收口（第 6 块）。
+
+反向也成立：任何一条线上现象，都能落回这条链上的某一段。
 
 ## 核心概念表
 
+完整名单（含每个概念对应的代码符号）见[术语表](/guide/glossary)。
+
 | 概念 | 一句话 |
 | --- | --- |
-| shard | 一份独立持有的表数据，路由的最小单位（也叫分片） |
-| 分片客户端 | 只连一个 shard 的传输实现，只有 gRPC/bRPC 有这一层 |
+| 分片 | 一份独立持有的表数据，路由的最小单位（也叫 shard） |
 | 分片层 | 负责路由、切块、并发扇出与结果回填的外壳 |
-| 压缩块 | wire 上的定长头加 float 行，Get/Put 的载荷单位 |
-| 命令 | 协议里的 RPC 或命令枚举，PS 的控制入口 |
-| 槽位 | local_shm 里一块定长的请求/响应缓冲区 |
-| 提交步 | 稀疏更新的 (session, step, chunk) 三元组，去重的依据 |
+| 单分片客户端 | 只连一个分片的传输实现，只有 gRPC / bRPC 有这一层 |
+| 压缩块 | 线上传的一行：定长头带 key 与维度，后面紧跟 float 数据 |
+| 命令 | 协议里除读写之外的入口：清空、重载、灌假数据、checkpoint |
+| 槽位 | 共享内存里一块定长的请求 / 响应缓冲区 |
+| 提交步 | 稀疏更新的「会话 + 步号 + 分块」三元组，去重的依据 |
 
 ## 建议读法
 
-- 想知道一次 Get 从头到尾发生了什么：1 → 3 → 4 → 5（先读共同骨架），再接自己用的那条路径（6、7 或 8）。
-- 想确认某个配置到底生不生效：2 → [第 10 块配置表](./config) → 风险条目的降级边界；线上排查则从风险标题定位现象，再回到对应块读机制。
+- 想知道一次读取从头到尾发生了什么：第 1 块 → 第 3 块 → 第 4 块 → 第 5 块的共同骨架，再接自己用的那条路径（第 6、7 或 8 块）。
+- 想确认某个配置到底生不生效：第 2 块 → [配置表](./config) → 风险条目里的降级边界。
+- 线上排查：先从风险标题定位现象，再回到对应块读机制。
 
 ## 与相邻章节的接口
 
-- **[第 02 章（计算层）](../ch02/)**：`BasePSClient` 是唯一入口；`PrefetchParameter/IsPrefetchDone/WaitForPrefetch/GetPrefetchResult` 构成预取句柄协议，`SubmitUpdateParameterAsync/WaitUpdateParameter` 默认抛异常表示后端不支持异步更新。张量只能是 `FLOAT32` 二维，`{0, dim}` 表示「由后端分配」。
-- **[第 04 章（RDMA）](../ch04/)**：`RDMAPSClientAdapter` 实现同一个 `BasePSClient`，但有自己的部署校验和 `rdma_control_plane.proto`；本章只把它当作工厂的一个分支。bRPC 的 `use_rdma` 是 bRPC Channel 内部选项，与会话式 raw-verbs 路径不同。
-- **[第 05 章（存储）](../ch05/)**：`CachePS` 通过 `BaseKV` 的 `BatchGet/BatchGetFlat/BatchGetDirectFixedRows/BatchPut/BatchGetIndexOnly` 访问存储，并把 `tid` 原样传下去；gRPC/bRPC 恒传 0，local_shm 传 worker 的 `ready_queue_id`。checkpoint 的落盘格式与 `CheckpointRecordCount` 语义由存储层定义。
-- **[第 06 章（测试与工具）](../ch06/)**：`grpc_ps_bench.cpp` 只测 `LoadFakeData/DumpFakeData` 的上下行带宽；`ps_transport_benchmark` 与 `mixed` 基准通过 `CreatePSClient` 复用同一套选型逻辑。
+- **[第 02 章（计算层）](../ch02/)**：`BasePSClient` 是唯一入口。预取靠一套四步句柄协议（发起、查完成、等完成、取结果）；异步更新默认不支持，调用会抛异常。张量只能是 `FLOAT32` 二维，形状写成 `{0, dim}` 表示「由后端分配」。
+- **[第 04 章（RDMA）](../ch04/)**：RDMA 客户端实现同一个入口，但有自己的部署校验和一套控制面协议。本章只把它当作工厂里的一个分支。注意 bRPC 的 `use_rdma` 是 bRPC 框架自己的选项，与会话式 RDMA 路径不是一回事。
+- **[第 05 章（存储）](../ch05/)**：参数服务器核心通过一组批量读写接口访问存储，并把线程号原样传下去；gRPC / bRPC 恒传 0，local_shm 传 worker 的 `ready_queue_id`。checkpoint 的落盘格式与记录数语义由存储层定义。
+- **[第 06 章（测试与工具）](../ch06/)**：`grpc_ps_bench.cpp` 只测灌数据 / 取数据的上下行带宽；`ps_transport_benchmark` 与 `mixed` 基准复用同一套选型逻辑。
