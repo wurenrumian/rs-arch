@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * 改写保真闸门：新稿必须保住原稿（git HEAD）里的每一个行内代码符号。
+ * 改写保真闸门：新稿必须保住原稿（默认 git HEAD，可用 --base 指定）里的每一个行内代码符号。
  *
  *   npm run check:tokens                       # 所有改过的 docs 页
  *   npm run check:tokens docs/ch05/ssd-nvm.md  # 指定文件
@@ -15,7 +15,15 @@ import { readFileSync } from 'node:fs'
 const ALLOW = {
   // 原稿写错了名字，基线源码里不存在 BatchLoadIndexedFloatRange
   'docs/ch05/risks.md': { BatchLoadIndexedFloatRange: 'BulkLoadIndexedFloatRange' },
-  'docs/ch05/read-path.md': { BatchLoadIndexedFloatRange: 'BulkLoadIndexedFloatRange' }
+  'docs/ch05/read-path.md': { BatchLoadIndexedFloatRange: 'BulkLoadIndexedFloatRange' },
+  // 基线里没有 ShouldUseDram，实际判定函数是 TryAllocDram
+  'docs/ch05/value-store.md': {
+    'HybridValueStore::ShouldUseDram': 'HybridValueStore::TryAllocDram',
+    '#HybridValueStore::ShouldUseDram': '#HybridValueStore::TryAllocDram'
+  },
+  'docs/ch05/appendix.md': { 'HybridValueStore::ShouldUseDram': 'HybridValueStore::TryAllocDram' },
+  // 表格单元格里的裸竖线会把表切歪，故在表内拆写、在代码位置保留原串
+  'docs/ch05/allocator.md': { 'mmap(MAP_PRIVATE | MAP_ANONYMOUS)': 'mmap(MAP_PRIVATE | MAP_ANONYMOUS)' }
 }
 
 function changedDocs() {
@@ -27,6 +35,8 @@ function changedDocs() {
 }
 
 const args = process.argv.slice(2)
+const baseIdx = args.indexOf('--base')
+const BASE = baseIdx >= 0 ? args.splice(baseIdx, 2)[1] : 'HEAD'
 const files = args.length ? args : changedDocs()
 if (!files.length) {
   console.log('没有改动中的文档。')

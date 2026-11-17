@@ -19,7 +19,7 @@ outline: [2, 3]
 | `value.ssd_allocator.base_offset_bytes` | `0` | slab/buddy 块起始地址；静态布局另加页号 | 静态布局要求页对齐 |
 | `*.io.type` / `*.io.queue_depth` / `*.io.base_offset_bytes` | `IOURING` / `512` / `0` | `SsdValueStore`、静态布局、SSD 索引 | 另一选项 `SPDK`；深度决定在途窗口；`base_offset_bytes` 映射为 `page_id_offset`，静态布局显式加页号，plain 值路径基本无效 |
 | `*.io.completion_poll_spins` | `8192` | `IoUringBackend` 构造 | 完成收割的自旋次数，∈ [0, 1e6]；`0` 表示不忙轮询、直接阻塞等待 |
-| `value.tiering.high_watermark_ratio` | `0.85` | `HybridValueStore::ShouldUseDram`、CLOCK 的 DRAM 上限 | `none` / `lru` 只影响分配时的介质选择；`clock` 用它算可驻留总量 |
+| `value.tiering.high_watermark_ratio` | `0.85` | `HybridValueStore::TryAllocDram`、CLOCK 的 DRAM 上限 | `none` / `lru` 只影响分配时的介质选择；`clock` 用它算可驻留总量 |
 | `value.tiering.cache_policy` | `none` | `HybridValueStore` 构造 | `lru` / `clock` / `adaptive`（大小写不敏感），其他值抛异常 |
 | `value.tiering.cache_budget_ratio` | `0.05` | LRU 预算预扣（`adaptive` 会改写） | 仅 `lru` 使用，∈ (0, 1]；`clock` 不预扣 |
 | `value.tiering.cache_shards` / `promote_min_misses` | `16` / `2` | 缓存与 CLOCK 分片、晋升门槛 | 分片数 ∈ [1, 4096]；成功读次数达到门槛才尝试晋升，≥ 1 |

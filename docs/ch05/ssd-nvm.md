@@ -64,7 +64,7 @@ sequenceDiagram
 | 删除 | 沿探测链每进一个 chunk 取它的 `lock_`，命中后由 `DeleteLocked` 在持锁下递减沿途 `OverflowCount` 再删条目，遇到正在迁移的 chunk 重试整条探测 |
 | 恢复校验 | `dict_->Valid(file_size)` 校验 `capacity_`、`chunk_num_ * 14 == capacity_`、`MemorySize` 与遍历计数一致 |
 | 恢复动作 | 通过则 `Reload` 并行重建 size / overflow 链，并对每个 value 调 `shm_malloc_->AddMallocs4Recovery`；该方法只打 "not implement"，占用位图实际靠 chunk 头里的 bitmap 恢复 |
-| 批量读 | `BatchGet` 受 gflag `prefetch_method` 控制：0 逐 key `Get`，1 走 `PetMultiKV::BatchGet` 预取下一个 key 的 shard |
+| 批量读 | `BatchGet` 受 gflag `prefetch_method` 控制：`0` 逐 key `Get`，`1` 走 `PetMultiKV::BatchGet` 预取下一个 key 的 shard |
 | 刷新与检查点 | `persistence.h#clflushopt` 首行 `return;`，`clflushopt_range` 只做 `sfence`；`PetMultiKV` 没有任何 flush 或检查点接口；`KVEnginePetKV` 显式重写 `SaveCheckpoint` / `LoadCheckpoint` / `clear()`，打 `ERROR` 说明共享内存不持久，前两者返回 `false`，`clear()` 直接不改动存储 |
 
 ## 它为什么存在
@@ -96,7 +96,7 @@ sequenceDiagram
 | 方面 | 做法 |
 | --- | --- |
 | 描述文件 | `Artifact` 记 `strategy`、`page_size`、`row_size`、`keys`、`copies` 与 checksum |
-| 句柄 | `key + 1`，0 表示缺失 |
+| 句柄 | `key + 1`，`0` 表示缺失 |
 | 分配与释放 | `Alloc` 与批量分配直接抛异常，`Free` 是空实现，布局固定，不能新增 key |
 | 单条读 | 只读 primary |
 | 批量读 | 每轮选覆盖未完成 key 最多的页，一页可同时满足多个 key，MaxEmbed 还能命中副本页 |

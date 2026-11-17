@@ -12,10 +12,12 @@ outline: [2, 3]
 
 四种基础实现共用同一组动作：分配、写入、读取、取容量、释放。接口一样，差别只有三处：字节落在哪种介质、句柄怎么解释、长度从哪读。第五种不是新介质，而是时钟策略下换上来的整体替身。
 
+下面这张图只回答一件事：同一个句柄交到每种实现手里，各自怎么被翻成一段字节。
+
 ```mermaid
 flowchart TD
   H["句柄 一个 64 位整数"] --> Q{"交给哪种值存储"}
-  Q -->|"内存实现"| D["低位移出地址 直接当指针 长度问分配器"]
+  Q -->|"内存实现"| D["句柄就是偏移 加基址就是指针 长度问分配器"]
   Q -->|"盘上实现"| S["按块号与槽号定位 先定块再定页 长度读槽头 4 字节"]
   Q -->|"定长布局"| L["句柄就是 key 加一 查布局文件定位页 长度取行宽"]
   Q -->|"分层实现"| T["最高位标介质 其余位原样转交子层"]
@@ -77,7 +79,7 @@ RDMA 背后区域只透出内存子层：`RDMABackingData()` 只覆盖 DRAM 子�
 - `src/storage/value_store/value_store.h#ValueStore` — `Alloc`/`Write`/`Read`/`Retire`/`DirectPtr` 的公共形状。
 - `src/storage/value_store/dram_value_store.h#DramValueStore::Read`、`#DramValueStore::SlotCapacity` — 槽容量即返回长度。
 - `src/storage/value_store/ssd_value_store.h#SsdValueStore`、`src/storage/value_store/ssd_static_layout_value_store.h#SsdStaticLayoutValueStore` — 块号+槽号与长度头、定长布局与页锁。
-- `src/storage/value_store/hybrid_value_store.h#HybridValueStore::Alloc`、`#HybridValueStore::ShouldUseDram`、`#HybridValueStore::kSsdFlag` — 介质选择与 handle 最高位。
+- `src/storage/value_store/hybrid_value_store.h#HybridValueStore::Alloc`、`#HybridValueStore::TryAllocDram`、`#HybridValueStore::kSsdFlag` — 介质选择与 handle 最高位。
 - `src/storage/value_store/tiered_clock_value_store.h#TieredClockValueStore`、`#TieredClockValueStore::Promote`、`#TieredClockValueStore::FreeLocked` — CLOCK 模式下的句柄、晋升与槽回收。
 
 ## 交付一句

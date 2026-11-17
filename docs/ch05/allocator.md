@@ -10,7 +10,7 @@ outline: [2, 3]
 
 举例：一行 512 字节加上 8 字节头，落进 520 字节这一档；一个 1 MiB 的块能切出两千个左右，装一百万行就要五百来个块。这些块全在构造期向操作系统要一次，运行期只是在自己的地址空间里切来切去。
 
-所以分配器要回答两个问题：切多大的块给这次申请，以及块回来之后能不能复用。
+所以分配器要回答两个问题：切多大的块给这次申请，以及块回来之后能不能复用。下面这张图只跟进一次申请和一次归还。
 
 ```mermaid
 flowchart TD
@@ -40,7 +40,7 @@ flowchart TD
 
 | `medium` 参数 | 实际后端 | 语义 |
 |---------------|----------|------|
-| `"DRAM"` | `ANONY_DRAM` | `mmap(MAP_PRIVATE | MAP_ANONYMOUS)`；`filename` 只用于日志 |
+| `"DRAM"` | `ANONY_DRAM` | 私有匿名映射（`MAP_PRIVATE` 加 `MAP_ANONYMOUS`）；`filename` 只用于日志 |
 | `"SSD"` | `FS_DAX` | 真正 `open + posix_fallocate + mmap(MAP_SHARED)` 的文件 |
 | `DEV_DAX` | 已注册但选不到 | `ConfigForMedium` 里对应分支被注释掉，只有直接调 `PMMmapRegisterCenter::Register` 才走得到 |
 | 其他 | `LOG(FATAL)` | 没有 `"PM"` / `"NVM"` 分支 |
@@ -79,7 +79,7 @@ flowchart TD
 
 - `src/memory/malloc.h#MallocApi`、`src/memory/allocators/concurrent_slab_memory_pool.h#ConcurrentSlabMemoryPool` — 下沉接口、默认分配器、构造删同路径文件、耗尽 FATAL。
 - `src/memory/allocators/persist_loop_slab_allocator.cc#PersistLoopShmMalloc::New` — 循环首次适应。
-- `src/memory/shm_file.cc#ShmFile::ConfigForMedium`、`#AnonyDramShmFile::Initialize`、`#FsDaxShmFile::Initialize` — 介质映射。
+- `src/memory/shm_file.cc#ShmFile::ConfigForMedium`、`#AnonyDramShmFile::Initialize`、`#FsDaxShmFile::Initialize` — 介质映射：DRAM 档走 `mmap(MAP_PRIVATE | MAP_ANONYMOUS)`，SSD 档才是打开文件再映射。
 - `src/memory/epoch_manager.h#EpochManager`、`src/memory/malloc.h#ShmEpochRecycle` — epoch 与延迟回收。
 
 ## 交付一句
