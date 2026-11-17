@@ -29,7 +29,12 @@ export function mermaidToSvg(md: MarkdownRenderer) {
 
     try {
       const { svg } = render(source, { idPrefix: `rs${hash(source)}-${seq}` })
-      return `<div class="rs-diagram">${svg}</div>\n`
+      return (
+        '<div class="rs-diagram-wrap">' +
+        `<div class="rs-diagram">${svg}</div>` +
+        '<button type="button" class="rs-zoom-btn" data-rs-zoom aria-haspopup="dialog" aria-label="放大这张图" title="放大查看">放大</button>' +
+        '</div>\n'
+      )
     } catch (error) {
       if (!(error instanceof PeleError)) throw error
       const where = `${env.path ?? '?'} 正文第 ${line} 行的 mermaid 块`
