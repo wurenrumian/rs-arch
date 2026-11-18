@@ -375,6 +375,14 @@ body {
   cursor: zoom-in;
 }
 
+/* 很宽的图（泳道、时间线）在正文栏里会被压成缩略图。
+   全景页隐藏右侧目录，让这张图站满可用版面；窄屏仍按容器宽度缩放。 */
+@media (min-width: 1024px) {
+  .rs-panorama .rs-diagram-wrap--wide {
+    width: min(1000px, calc(100vw - 360px));
+  }
+}
+
 /* 图角上的放大入口：图本身也可点，这里给一个看得见的把手。 */
 .rs-zoom-btn {
   position: absolute;

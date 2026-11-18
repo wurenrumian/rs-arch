@@ -28,6 +28,8 @@ let origin: { parent: Node; next: Node | null; style: string | null } | null = n
 let lastFocus: Element | null = null
 
 const view: View = { scale: 1, x: 0, y: 0, w: 0, h: 0, fit: 1 }
+/** 上一次真正写进 SVG 的宽高，避免平移时反复触发重排。 */
+const painted = { w: 0, h: 0 }
 const pointers = new Map<number, { x: number; y: number }>()
 let pinch: { dist: number; scale: number; cx: number; cy: number; x: number; y: number } | null = null
 /** 一次按下到抬起的记录：判断这是「点空白」还是「拖了一把」。 */
@@ -38,7 +40,21 @@ function clamp(value: number, lo: number, hi: number) {
 }
 
 function render() {
-  if (canvas) canvas.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.scale})`
+  // 缩放改 SVG 自己的宽高，不用 CSS transform 拉大。
+  // 浮层祖先有 backdrop-filter，canvas 又被提升成合成层；transform 缩放会把已经
+  // 栅格化的图当位图放大，文字与细线就糊了。改宽高是让浏览器按新尺寸重画矢量。
+  // 平移仍然用 transform（只有位移，不会糊），所以拖动不用反复重排。
+  if (canvas) canvas.style.transform = `translate(${view.x}px, ${view.y}px)`
+  if (active) {
+    const w = view.w * view.scale
+    const h = view.h * view.scale
+    if (Math.abs(w - painted.w) > 0.01 || Math.abs(h - painted.h) > 0.01) {
+      painted.w = w
+      painted.h = h
+      active.style.width = `${w}px`
+      active.style.height = `${h}px`
+    }
+  }
   if (percent) percent.textContent = `${Math.round(view.scale * 100)}%`
 }
 
@@ -237,6 +253,8 @@ function open(svg: SVGSVGElement) {
   svg.style.maxWidth = 'none'
   svg.style.width = `${view.w}px`
   svg.style.height = `${view.h}px`
+  painted.w = view.w
+  painted.h = view.h
 
   dialog.hidden = false
   document.documentElement.classList.add('rs-zoom-open')

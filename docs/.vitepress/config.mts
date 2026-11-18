@@ -106,6 +106,7 @@ const sidebar: Group[] = [
     text: '开始',
     items: [
       { text: '这个站怎么读', link: '/guide/' },
+      { text: '启动与运行全景', link: '/guide/lifecycle' },
       { text: '十条核心事实', link: '/guide/facts' },
       { text: '术语表', link: '/guide/glossary' },
       { text: '代码索引', link: '/guide/code-index' }

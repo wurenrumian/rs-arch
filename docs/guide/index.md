@@ -86,7 +86,8 @@ npm run check:tables    # 表格能不能被真的渲染成 <table>
 **改存储**：第 05 章的[读路径](/ch05/read-path)与[写路径](/ch05/write-path) →
 [分层策略](/ch05/tiering) → 第 06 章的[测试地图](/ch06/test-map)与[基准地图](/ch06/benchmark-map)。
 
-只想先建立整体印象，读[十条核心事实](/guide/facts)就够了。
+只想先建立整体印象，读[十条核心事实](/guide/facts)与[启动与运行全景](/guide/lifecycle)就够了：
+前者给结论，后者给一张从构建到稳态训练的流程图。
 
 ## 与代码仓库的关系
 

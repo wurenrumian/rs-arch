@@ -72,6 +72,7 @@ RecStore 把推荐模型的稀疏 embedding 表放到训练进程之外：Python
 ## 从哪里开始
 
 <div class="rs-cards">
+  <RsCard to="/guide/lifecycle" title="启动与运行全景">一张图看完构建、启动、建表与稳态训练：谁先起、谁等谁、哪一跳跨进程。</RsCard>
   <RsCard to="/guide/" title="这个站怎么读">阅读约定、证据标签、三条按目标划分的路线。</RsCard>
   <RsCard to="/guide/glossary" title="术语表">每个概念只有一个名字：概念名、一句话定义、对应的代码符号。</RsCard>
   <RsCard to="/guide/code-index" title="代码索引">仓库目录 ↔ 章节的对照表，想改哪里直接跳到对应块。</RsCard>

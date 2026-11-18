@@ -28,9 +28,11 @@ export function mermaidToSvg(md: MarkdownRenderer) {
     const seq = (env.rsDiagram = (env.rsDiagram ?? 0) + 1)
 
     try {
-      const { svg } = render(source, { idPrefix: `rs${hash(source)}-${seq}` })
+      const { svg, width } = render(source, { idPrefix: `rs${hash(source)}-${seq}` })
+      // 很宽的图（泳道、时间线）在正文栏里会被压得太小，给个可以横向滚动的标记。
+      const wide = width >= 1100 ? ' rs-diagram-wrap--wide' : ''
       return (
-        '<div class="rs-diagram-wrap">' +
+        `<div class="rs-diagram-wrap${wide}">` +
         `<div class="rs-diagram">${svg}</div>` +
         '<button type="button" class="rs-zoom-btn" data-rs-zoom aria-haspopup="dialog" aria-label="放大这张图" title="放大查看">放大</button>' +
         '</div>\n'
