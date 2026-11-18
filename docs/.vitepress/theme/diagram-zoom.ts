@@ -30,6 +30,8 @@ let lastFocus: Element | null = null
 const view: View = { scale: 1, x: 0, y: 0, w: 0, h: 0, fit: 1 }
 const pointers = new Map<number, { x: number; y: number }>()
 let pinch: { dist: number; scale: number; cx: number; cy: number; x: number; y: number } | null = null
+/** 一次按下到抬起的记录：判断这是「点空白」还是「拖了一把」。 */
+let press: { id: number; moved: number; backdrop: boolean } | null = null
 
 function clamp(value: number, lo: number, hi: number) {
   return value < lo ? lo : value > hi ? hi : value
@@ -96,7 +98,7 @@ function build() {
       <button type="button" data-zoom="in" aria-label="放大" title="放大（+）">+</button>
       <button type="button" data-zoom="fit" title="适应窗口（0）">适应</button>
       <button type="button" data-zoom="close" title="关闭（Esc）">关闭</button>
-      <span class="rs-zoom-hint">滚轮缩放 · 拖动平移</span>
+      <span class="rs-zoom-hint">滚轮缩放 · 拖动平移 · 点空白关闭</span>
     </div>`
 
   document.body.appendChild(dialog)
@@ -122,7 +124,16 @@ function build() {
     stage!.setPointerCapture(e.pointerId)
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
     if (pointers.size === 1) stage!.classList.add('is-dragging')
+    if (pointers.size === 1) {
+      // 记住这一下是不是点在图的空白处：没拖动就抬手时用它决定要不要退出。
+      press = {
+        id: e.pointerId,
+        moved: 0,
+        backdrop: !(active && e.target instanceof Node && active.contains(e.target))
+      }
+    }
     if (pointers.size === 2) {
+      press = null
       const [a, b] = [...pointers.values()]
       const rect = stage!.getBoundingClientRect()
       pinch = {
@@ -142,8 +153,11 @@ function build() {
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
 
     if (pointers.size === 1) {
-      view.x += e.clientX - before.x
-      view.y += e.clientY - before.y
+      const dx = e.clientX - before.x
+      const dy = e.clientY - before.y
+      if (press && press.id === e.pointerId) press.moved += Math.abs(dx) + Math.abs(dy)
+      view.x += dx
+      view.y += dy
       clampPan()
       render()
       return
@@ -165,14 +179,24 @@ function build() {
   })
 
   const release = (e: PointerEvent) => {
+    const last = pointers.size === 1
+    const tap = !!press && press.id === e.pointerId && press.moved < 8 && press.backdrop
     pointers.delete(e.pointerId)
     if (pointers.size < 2) pinch = null
     if (pointers.size === 0) stage!.classList.remove('is-dragging')
+    if (last && tap && e.type === 'pointerup') {
+      press = null
+      close()
+      return
+    }
+    if (pointers.size === 0) press = null
   }
   stage.addEventListener('pointerup', release)
   stage.addEventListener('pointercancel', release)
 
-  stage.addEventListener('dblclick', () => {
+  stage.addEventListener('dblclick', (e) => {
+    // 只在图上双击才切换倍率；空白处的那一下是用来退出的。
+    if (!active || !(e.target instanceof Node) || !active.contains(e.target)) return
     if (view.scale > view.fit * 1.6) fit()
     else zoomAt((view.fit * 2.4) / view.scale, stage!.clientWidth / 2, stage!.clientHeight / 2)
   })
@@ -200,6 +224,7 @@ function open(svg: SVGSVGElement) {
   if (active) close()
 
   lastFocus = document.activeElement
+  press = null
 
   const box = svg.getBoundingClientRect()
   const vb = svg.viewBox?.baseVal
@@ -221,6 +246,7 @@ function open(svg: SVGSVGElement) {
 
 function close() {
   if (!dialog || dialog.hidden) return
+  press = null
   if (active && origin) {
     if (origin.style === null) active.removeAttribute('style')
     else active.setAttribute('style', origin.style)
