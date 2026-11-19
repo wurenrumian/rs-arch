@@ -74,7 +74,8 @@ const ch04: Item[] = [
 
 const ch05: Item[] = [
   { text: '阅读地图', link: '/ch05/' },
-  { text: '1 · 组合矩阵', link: '/ch05/composite-matrix' },
+  { text: '先读 · 一次查询的全程', link: '/ch05/journey' },
+  { text: '1 · 引擎与组合', link: '/ch05/composite-matrix' },
   { text: '2 · 索引', link: '/ch05/index-engine' },
   { text: '3 · 值存储', link: '/ch05/value-store' },
   { text: '4 · 分配器', link: '/ch05/allocator' },
@@ -86,6 +87,15 @@ const ch05: Item[] = [
   { text: '附录 · 配置与开关总表', link: '/ch05/appendix' },
   { text: '风险与未确认点', link: '/ch05/risks' },
   { text: '证据索引', link: '/ch05/evidence' }
+]
+
+const ch07: Item[] = [
+  { text: '阅读地图', link: '/ch07/' },
+  { text: '1 · 一条读的代码路径', link: '/ch07/read-route' },
+  { text: '2 · 一条写的代码路径', link: '/ch07/write-route' },
+  { text: '3 · 启动与建表', link: '/ch07/startup' },
+  { text: '4 · 定位手册', link: '/ch07/locator' },
+  { text: '证据索引', link: '/ch07/evidence' }
 ]
 
 const ch06: Item[] = [
@@ -118,6 +128,7 @@ const sidebar: Group[] = [
   { text: '04 · RDMA 传输深潜', collapsed: true, items: ch04 },
   { text: '05 · 存储与内存', collapsed: true, items: ch05 },
   { text: '06 · 模型接入、测试、基准与工具', collapsed: true, items: ch06 },
+  { text: '07 · 代码导读：从训练侧到存储引擎', collapsed: true, items: ch07 },
   {
     text: '质量档案',
     collapsed: true,
@@ -176,14 +187,15 @@ export default defineConfig({
     nav: [
       { text: '总览', link: '/guide/', activeMatch: '^/guide/' },
       {
-        text: '六章',
+        text: '七章',
         items: [
           { text: '01 · 系统总览与构建', link: '/ch01/' },
           { text: '02 · 计算层', link: '/ch02/' },
           { text: '03 · 参数服务器与传输', link: '/ch03/' },
           { text: '04 · RDMA 深潜', link: '/ch04/' },
           { text: '05 · 存储与内存', link: '/ch05/' },
-          { text: '06 · 测试与工具', link: '/ch06/' }
+          { text: '06 · 测试与工具', link: '/ch06/' },
+          { text: '07 · 代码导读', link: '/ch07/' }
         ]
       },
       { text: '质量档案', link: '/quality/risks', activeMatch: '^/quality/' },

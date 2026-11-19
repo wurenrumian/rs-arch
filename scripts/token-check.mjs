@@ -23,7 +23,11 @@ const ALLOW = {
   },
   'docs/ch05/appendix.md': { 'HybridValueStore::ShouldUseDram': 'HybridValueStore::TryAllocDram' },
   // 表格单元格里的裸竖线会把表切歪，故在表内拆写、在代码位置保留原串
-  'docs/ch05/allocator.md': { 'mmap(MAP_PRIVATE | MAP_ANONYMOUS)': 'mmap(MAP_PRIVATE | MAP_ANONYMOUS)' }
+  'docs/ch05/allocator.md': { 'mmap(MAP_PRIVATE | MAP_ANONYMOUS)': 'mmap(MAP_PRIVATE | MAP_ANONYMOUS)' },
+  // 版本基线随本次同步前移到 a1cfcc81f
+  'docs/index.md': { '1f340167d': 'a1cfcc81f' },
+  'docs/guide/index.md': { '1f340167d': 'a1cfcc81f' },
+  'docs/guide/code-index.md': { '1f340167d': 'a1cfcc81f' }
 }
 
 function changedDocs() {

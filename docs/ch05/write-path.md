@@ -4,11 +4,27 @@ description: 写入不是原地覆盖：先要新槽、写入字节，再让索�
 outline: [2, 3]
 ---
 
-写入看着像"改一行"，在存储层却是一次换槽：新字节写在新地方，索引换一根指针，旧地方排队等回收。这一页回答两件事——一次写有几种落法、每种各经过哪几层；以及为什么这条路径宁可多分配一次，也不肯让读等它。
+写入看着像"改一行"，在存储层却通常是一次换槽：新字节写在新地方，索引换一根指针，旧地方排队等回收。这一页回答两件事——一次写有几种落法、每种各经过哪几层；以及为什么这条路径宁可多分配一次，也不肯让读等它。
 
 ## 它是什么
 
 举例：一次稀疏更新送进存储层 8000 个 key、每行 128 维，约 4 MB。如果每行都换新槽，这一次就要分配 4 MB、退役 4 MB；而优化器每步都来这么一次，所以另有一条原地改的路。
+
+先看覆盖写。它经过四步，顺序不能换：
+
+1. 向值存储要一个新槽，把字节写进去。
+2. 索引改成指向新句柄，同时把旧句柄交回来。
+3. 旧句柄交给退役，进入延迟回收队列。
+4. 只有原本不存在的 key 才登记进检查点列表。
+
+旧槽从第 2 步起就没人再写了，所以握着旧句柄的读者还能读到一份一致的旧值；这就是写时复制换来的读不阻塞。
+
+再看优化器更新。它走另一条路：
+
+1. 把 8 位 tag 拼进 key 的高位，同一行在不同标签下算不同的 key。
+2. 整批试探能不能拿到池内原地指针。
+3. 能拿到，就在池内按列减梯度，不分配、不换槽。
+4. 拿不到（盘上行、静态布局、开了在线准入），就退到混合路径：读出来、改完、写回。
 
 ```mermaid
 flowchart TD
@@ -30,14 +46,14 @@ flowchart TD
 | --- | --- |
 | 覆盖写 | 分新槽写字节、索引改指、退役旧槽，只有新 key 才记账 |
 | 批量写 无重复 | 一次批量分槽，一次批量替换并交回旧句柄，再统一退役 |
-| 批量写 有重复 | 退化成逐条覆盖写，同批顺序才确定 |
+| 批量写 有重复 | 同批重复 key 以最后一次赋值为准，仍然一次批量分配、一次批量替换 |
 | 灌数据 | 要求默认行大小非 0，按固定步长切开传入缓冲，批量分槽后批量建索引 |
 | 优化器更新 | 能直接定址就在池内减；不能就读出改完写回，缺失行补初值 |
 | 删除 | 独占锁下摘索引、退役，再从每线程的检查点列表里删掉 |
 
 批量写还改了一处校验顺序：先把每一行的行宽都校验完、把重复 key 收齐，再决定走逐条还是批量；不会撞上第一个重复就中断，把后面的行跳过去不校验。
 
-优化器这条路要单独说：它是唯一一条不换槽的写，把上层给的 8 位标签拼进 key 的高位，于是同一行在不同标签下算不同的 key；命中路径直接在池内做减法，不走写时复制。
+优化器这条路要单独说：命中路径直接在池内做减法，不走写时复制；同一行在不同 tag 下算不同 key，所以表号不需要在存储层再存一份。
 
 拿不到原位指针时改走混合路径：先按 key 去重并记下每个输入行的目标位置，重复 key 按输入顺序累加；内存行照旧原位改，只有盘上的行要读出来改完写回，最后给缺失的 key 补上初值。拷贝出来的行不算存储，写回之前后续读看不到这次更新。
 
@@ -77,7 +93,7 @@ flowchart TD
 | --- | --- |
 | 覆盖写 | `AllocAndWrite` 向值存储要新槽并写字节，`Index::Put` 换指并交回旧句柄，旧句柄 `Retire`；只有旧句柄为空的新 key 才 `TrackKey` |
 | 批量写 无重复 | `BatchAllocAndWrite` 一次分完所有槽，`Index::BatchPutWithOld` 一次替换并交回旧句柄数组，再统一 `Retire` |
-| 批量写 有重复 | 退化成逐条 `PutInternal`：同批里重复 key 的最终值取决于扫描顺序，批量替换给不出确定答案 |
+| 批量写 有重复 | 同批按 key 去重，最后一次赋值胜出，仍然通过批量分配与替换发布 |
 | 灌数据 | `BulkLoad` 要求 `default_value_size_hint` 非 0，按固定步长切开传入缓冲，批量分配后 `Index::BatchPut` |
 | 删除 | `BatchDelete` 在独占锁下 `Index::Get` 取旧句柄、`Index::Delete` 摘索引、`Retire` 归还，再从每线程检查点列表里删掉 |
 
@@ -117,7 +133,7 @@ flowchart TD
 入口文件：
 
 - `src/storage/kv_engine/engine_composite.h#KVEngineComposite::PutInternal` — 分配、替换、退役的顺序。
-- `src/storage/kv_engine/engine_composite.h#KVEngineComposite::BatchPut` — 重复 key 退化逐条。
+- `src/storage/kv_engine/engine_composite.h#KVEngineComposite::BatchPut` — 重复 key 去重与批量替换。
 - `src/storage/kv_engine/engine_composite.h#KVEngineComposite::ApplySgdUpdateFlat` — tag 拼 key 与原地更新。
 - `src/storage/kv_engine/engine_composite.h#KVEngineComposite::SaveCheckpoint`、`#KVEngineComposite::LoadCheckpoint` — 检查点格式与空引擎约束。
 - `src/storage/value_store/value_store.h#ValueStore::Retire`、`src/storage/value_store/hybrid_value_store.h#HybridValueStore` — 默认退役与分层丢弃延迟回收。

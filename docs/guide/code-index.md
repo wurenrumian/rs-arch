@@ -14,12 +14,12 @@ outline: [2]
 ::: tip 这里没有代码副本
 本站不 vendor RecStore，也不拉 `third_party` 子模块——仓库里只有文档。
 需要跳过去看源码时，用上游 [RecStore/RecStore](https://github.com/RecStore/RecStore)，
-版本对得上 `1f340167d` 即可。
+版本对得上 `a1cfcc81f` 即可。
 :::
 
 ## 一次读写的四个落点
 
-顺着一条调用链看，最先要读的是这四个文件：
+想按调用顺序走完整条路，用[第 07 章 · 代码导读](/ch07/)：它从训练侧的 forward 开始，一直跟到引擎里的 `BatchGetFlat` 与 `ApplySgdUpdateFlat`。下面是四个最常打开的落点：
 
 | 位置 | 是什么 | 在哪读 |
 |---|---|---|
@@ -70,6 +70,7 @@ outline: [2]
 | `src/storage/cache` | 分层读缓存 `tiered_read_cache.h` | [05 · 分层策略](/ch05/tiering) |
 | `src/storage/allocator`、`src/memory/allocators` | slab 分配器与并发内存池 | [05 · 分配器](/ch05/allocator) |
 | `src/storage/gpu_cache` | GPU 侧缓存 kernel 与无 hash 变体 | [05 · GPU 侧存储](/ch05/gpu) |
+| `src/python/pytorch/torchrec_kv` | torchrec 适配层：融合 id、预取、行读取 | [07 · 一条读的代码路径](/ch07/read-route) |
 
 ## 只想跑起来
 

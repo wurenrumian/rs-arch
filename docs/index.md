@@ -4,7 +4,7 @@ layout: home
 hero:
   name: RecStore 架构
   text: 稀疏 embedding 表为什么在训练进程之外
-  tagline: 六章 47 块，按“先骨架、再逐块”的节奏拆开：一次读写的调用链、参数服务器的四种传输、存储分层，以及改动之后怎么验证。
+  tagline: 七章 52 块，按“先骨架、再逐块”的节奏拆开：一次读写的调用链、参数服务器的四种传输、存储分层，以及从训练侧一路定位到存储引擎的代码导读。
   image:
     src: /hero.svg
     alt: RecStore 的三层结构：训练进程、参数服务器、存储层
@@ -44,6 +44,10 @@ features:
     details: rs_demo 怎么接、测试与基准各覆盖什么、改一处代码该跑哪几条验证、文档门禁在哪。
     link: /ch06/
     linkText: 6 块
+  - title: 07 · 代码导读：从训练侧到存储引擎
+    details: 跟一条读、一条写和一次启动，从 forward 一直走到 BatchGetFlat 与 ApplySgdUpdateFlat，附定位手册。
+    link: /ch07/
+    linkText: 4 条路线
 ---
 
 ## 一句话
@@ -76,17 +80,18 @@ RecStore 把推荐模型的稀疏 embedding 表放到训练进程之外：Python
   <RsCard to="/guide/" title="这个站怎么读">阅读约定、证据标签、三条按目标划分的路线。</RsCard>
   <RsCard to="/guide/glossary" title="术语表">每个概念只有一个名字：概念名、一句话定义、对应的代码符号。</RsCard>
   <RsCard to="/guide/code-index" title="代码索引">仓库目录 ↔ 章节的对照表，想改哪里直接跳到对应块。</RsCard>
-  <RsCard to="/guide/facts" title="十条核心事实">六章共同核对过的结论，先记住这十条，再看细节。</RsCard>
+  <RsCard to="/ch07/" title="代码导读">从 forward 到存储引擎的四条代码路径，以及按现象查文件的定位手册。</RsCard>
+  <RsCard to="/guide/facts" title="十条核心事实">七章共同核对过的结论，先记住这十条，再看细节。</RsCard>
   <RsCard to="/quality/risks" title="风险总表">15 条按影响面排序的坑：静默补零、无幂等重试、名不副实的持久化。</RsCard>
 </div>
 
 ## 事实基线
 
-本站正文按 RecStore 上游 `upstream/main` 的 `1f340167d` 核对，写作方式是
+本站正文按 RecStore 上游 `upstream/main` 的 `a1cfcc81f` 核对，写作方式是
 <strong>阅读地图 + 分块推进</strong>：每章开头先给部件表与概念表，然后一块一块展开，每块只回答一件事。
 
 <div class="rs-meta">
-  <span class="rs-badge">1f340167d</span> 代码在
+  <span class="rs-badge">a1cfcc81f</span> 代码在
   <a href="https://github.com/RecStore/RecStore">RecStore/RecStore</a>；
   本站不构建、不运行它，正文里的 <code>相对路径#符号</code> 都是对照源码读出来的。
 </div>
