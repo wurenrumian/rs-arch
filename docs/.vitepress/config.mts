@@ -130,16 +130,6 @@ const sidebar: Group[] = [
   { text: '06 · 模型接入、测试、基准与工具', collapsed: true, items: ch06 },
   { text: '07 · 代码导读：从训练侧到存储引擎', collapsed: true, items: ch07 },
   {
-    text: '质量档案',
-    collapsed: true,
-    items: [
-      { text: '风险总表', link: '/quality/risks' },
-      { text: '已修复记录', link: '/quality/fixes' },
-      { text: '文档与代码不一致', link: '/quality/doc-gaps' },
-      { text: '未确认清单', link: '/quality/unknowns' }
-    ]
-  },
-  {
     text: '维护',
     items: [{ text: '生成方式与版本基线', link: '/meta' }]
   }
@@ -198,7 +188,6 @@ export default defineConfig({
           { text: '07 · 代码导读', link: '/ch07/' }
         ]
       },
-      { text: '质量档案', link: '/quality/risks', activeMatch: '^/quality/' },
       { text: '维护', link: '/meta', activeMatch: '^/meta' }
     ],
 

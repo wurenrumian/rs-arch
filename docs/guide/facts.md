@@ -93,5 +93,4 @@ DRAM 那一档其实是匿名映射，共享内存引擎显式拒绝存档与清
 | 9 | `SAVE/LOAD_CHECKPOINT`、`ERROR`、`false` |
 | 10 | `report()`、`observability`、`remote`、`csv`、`jsonl`、`glog`、`none`、`report_API`、`USE_PERF_REPORT`、`Debug` |
 
-事实之外还有两类东西需要单独看：[风险总表](/quality/risks)（会咬人的行为）与
-[未确认清单](/quality/unknowns)（还没验证的推断）。
+事实之外的推断与风险，按章收在各章末尾的「风险」与「证据索引」里。

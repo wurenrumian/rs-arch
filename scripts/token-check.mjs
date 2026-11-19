@@ -9,7 +9,7 @@
  * 允许的例外写在 ALLOW 里，每条都要写明理由。
  */
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 
 /** 已知的、有意为之的符号替换：文件 → 旧符号 → 新符号 */
 const ALLOW = {
@@ -52,6 +52,8 @@ let checked = 0
 
 for (const file of files) {
   const rel = file.replace(/\\/g, '/').replace(/^\.?\//, '')
+  // 删掉的页没有“新稿”可比，跳过；否则 readFileSync 会在 ENOENT 上崩。
+  if (!existsSync(file)) continue
   let old
   try {
     old = execFileSync('git', ['show', `HEAD:${rel}`], { encoding: 'utf8', maxBuffer: 1 << 26 })

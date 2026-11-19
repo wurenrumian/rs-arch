@@ -58,3 +58,15 @@ outline: [2, 3]
 | `tiering.online_admission` 只有名单与 `PrepareExchange`，引擎从不调用 | 引擎接入二次未命中准入、同步/异步交换、世代失效、后台失败传播与 `DrainBackgroundWork` | `cb296098`、`f9d98eef` |
 | 没有生成 DRAM 名单的工具，基准也不能回放文本 query log | `tools/benchmarks/build_tiered_dram_profile.py`（含 ctest 单测）、`benchmark_kv_engine --read_trace_path`、`--load_batch_keys` | `cb296098` |
 | `BatchPut` 遇到第一个重复 key 就停，后面的行不校验 | 整批先校验行宽与重复 key，非法批次抛 `invalid_argument` 且不写任何一行 | `cb296098` |
+
+## 本轮已修复（f8fde5af4 → a1cfcc81f）
+
+| 问题 | 现在的行为 | commit |
+|------|------------|--------|
+| 16 线程并发灌 100 万 key 时，extendible hash 可能永远自旋：块满后所有线程都去 `Split`，抢不到 CAS 就重试，插入者计数 `sema` 降不到 0 | 分裂前先发布 `splitting` 意图，后到的插入者返回 -2、不再占插入者名额，计数得以排空；两条重试路径都让出 CPU | `b0df9d46a` |
+| 原地分裂返回后 `splitting` 标志没清，后续插入永远退回 -2 并在 `Insert` 里自旋 | 返回前清标志；`sema == -1` 仍持有该块，直到目录重发布 | `8caad8db4` |
+| SSD 批量写后段失败时，前面批次已分配的槽不回滚，容量只出不进 | 后一个 chunk 失败时释放前面 chunk 的分配 | `163f4fa34` |
+| COW 快照的槽可能被过早复用，并发读者会读到新数据 | 读进入 epoch，活跃读者退出前不回收；补退休阈值、写者背压、后台错误传播与关闭前 drain | `52cdae2fb`、`10d243a7d` |
+| tiered 的 DRAM 拷贝与 SSD 读串行，一次读叠加两段延迟 | 新增 `flat_read_mode="overlap"`：先提交 SSD 读，再校验与拷贝 DRAM 行，最后等完成；失败先排空已提交 I/O 再抛 | `10d243a7d` |
+| HPS 读与重复赋值没走批量路径，缺失 key 与存储的零值也分不清 | HPS 行直接读进 flat 输出、用命中掩码区分两者；重复赋值按 last-write-wins 合并且仍批量发布；并发写者各用独立可复用线程槽 | `e94d7b6c6`、`10d243a7d` |
+| jemalloc 的 `je_*` 别名随头文件包含顺序丢失 | 通过 CMake target 传 `JEMALLOC_NO_DEMANGLE`，别名稳定可用 | `6f60dc164` |

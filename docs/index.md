@@ -15,9 +15,6 @@ hero:
     - theme: alt
       text: 先看十条核心事实
       link: /guide/facts
-    - theme: alt
-      text: 风险总表
-      link: /quality/risks
 
 features:
   - title: 01 · 系统总览、仓库地图与构建
@@ -82,7 +79,6 @@ RecStore 把推荐模型的稀疏 embedding 表放到训练进程之外：Python
   <RsCard to="/guide/code-index" title="代码索引">仓库目录 ↔ 章节的对照表，想改哪里直接跳到对应块。</RsCard>
   <RsCard to="/ch07/" title="代码导读">从 forward 到存储引擎的四条代码路径，以及按现象查文件的定位手册。</RsCard>
   <RsCard to="/guide/facts" title="十条核心事实">七章共同核对过的结论，先记住这十条，再看细节。</RsCard>
-  <RsCard to="/quality/risks" title="风险总表">15 条按影响面排序的坑：静默补零、无幂等重试、名不副实的持久化。</RsCard>
 </div>
 
 ## 事实基线

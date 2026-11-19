@@ -21,6 +21,7 @@ outline: [2, 3]
 | `*.io.completion_poll_spins` | `8192` | `IoUringBackend` 构造 | 完成收割的自旋次数，∈ [0, 1e6]；`0` 表示不忙轮询、直接阻塞等待 |
 | `value.tiering.high_watermark_ratio` | `0.85` | `HybridValueStore::TryAllocDram`、CLOCK 的 DRAM 上限 | `none` / `lru` 只影响分配时的介质选择；`clock` 用它算可驻留总量 |
 | `value.tiering.cache_policy` | `none` | `HybridValueStore` 构造 | `lru` / `clock` / `adaptive`（大小写不敏感），其他值抛异常 |
+| `value.tiering.flat_read_mode` | `generic` | `HybridValueStore` 构造 | `generic` / `serial` / `overlap`；`overlap` 仅固定行宽 + plain SSD，CLOCK、读缓存、静态布局与在线交换仍走原逻辑；非法值抛 `invalid_argument` |
 | `value.tiering.cache_budget_ratio` | `0.05` | LRU 预算预扣（`adaptive` 会改写） | 仅 `lru` 使用，∈ (0, 1]；`clock` 不预扣 |
 | `value.tiering.cache_shards` / `promote_min_misses` | `16` / `2` | 缓存与 CLOCK 分片、晋升门槛 | 分片数 ∈ [1, 4096]；成功读次数达到门槛才尝试晋升，≥ 1 |
 | `value.tiering.expected_dram_bytes` | `0` | `adaptive` 策略选择 | 完整工作集的 value 字节数，`0` 为未知；≤ 水位时不开缓存 |

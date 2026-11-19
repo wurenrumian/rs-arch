@@ -36,7 +36,7 @@ outline: [2]
 | `model_zoo/`、`examples/` | 可运行样例：`criteo_kaggle/`、`rs_demo/`、`torchrec_dlrm/` | [06 · 训练接入](/ch06/training-integration) |
 | `tools/` | 基准 runner、注册式性能套件 `perf/`、配置 schema、CI 与打包 | [06 · 基准地图](/ch06/benchmark-map) |
 | `third_party/` | 15 个 git submodule 加脚本生成的安装前缀（本站不拉取） | [01 · 构建与打包](/ch01/build) |
-| `docs/`、`mkdocs.yml` | 上游自己的 mkdocs 文档站，与本站结论有出入的地方见[文档不一致](/quality/doc-gaps) | [06 · 工程工具](/ch06/tooling) |
+| `docs/`、`mkdocs.yml` | 上游自己的 mkdocs 文档站 | [06 · 工程工具](/ch06/tooling) |
 | `CMakeLists.txt`、`VERSION`、`pyproject.toml` | 构建入口；`VERSION` 是版本唯一来源，CMake 与 pyproject 都读它 | [01 · 构建与打包](/ch01/build) |
 
 ## `src/` 的 12 个模块

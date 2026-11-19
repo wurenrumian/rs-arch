@@ -36,6 +36,12 @@ flowchart TD
 | `clock` | 共享 `high_watermark * capacity` 全长 | 按热度双向交换，脏行先回写 | 一律拷贝，不再有直接指针 |
 | `adaptive` | 构造期按 `expected_dram_bytes` 估算工作集，在三者中选一个 | 同被选中的那个 | 同被选中的那个 |
 
+分层还有一个与放置无关的读侧开关：
+
+| 开关 | 取值 | 生效条件与做法 |
+| --- | --- | --- |
+| `flat_read_mode` | `generic`（默认）/ `serial` / `overlap` | 只在固定行宽 + plain SSD、且没开读缓存、静态布局或在线准入时生效；`overlap` 先提交 SSD 读，再校验并拷贝 DRAM 行，最后一起等，DRAM 拷贝出错会先排空已提交的 I/O 再抛 |
+
 LRU 的机制分两半：一半管结构与淘汰，一半管一致性与准入。
 
 | 关心的事 | 做法 |
